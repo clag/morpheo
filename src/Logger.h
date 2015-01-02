@@ -43,6 +43,7 @@ public:
     void setDebugActive(bool b) {debugActive = b;}
 
 private:
+    // Affiche-t-on les logs de niveau debug
     bool debugActive;
 };
 
