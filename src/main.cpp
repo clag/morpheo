@@ -21,7 +21,7 @@ int main(int argc, char *argv[])
 
     Logger* pLogger = new Logger(true);
 
-    /*	-------------------------------- */
+    /*	------------------------------- */
 
     MainWindow oIHM(pLogger);
     oIHM.show();
