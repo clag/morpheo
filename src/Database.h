@@ -21,6 +21,7 @@ public:
     ~Database();
     /**
      * @brief connexion
+     * @details Se connecter à une base PostgreSQL
      * @return
      */
     bool connexion();
