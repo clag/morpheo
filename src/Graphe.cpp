@@ -28,7 +28,7 @@ bool Graphe::build_SXYZ(){
         // CREATION DES TABLES SXYZ
 
         QSqlQueryModel createSXYZ;
-        createSXYZ.setQuery("CREATE TABLE SXYZ ( IDS SERIAL NOT NULL PRIMARY KEY, SX double precision, SY double precision, SZ double precision, GEOM geometry, DEG integer);");
+        createSXYZ.setQuery("CREATE TABLE SXYZ ( IDS SERIAL NOT NULL PRIMARY KEY, GEOM geometry, DEG integer);");
 
         if (createSXYZ.lastError().isValid()) {
             pLogger->ERREUR(QString("createSXYZ : %1").arg(createSXYZ.lastError().text()));
@@ -69,8 +69,8 @@ int Graphe::ajouterSommet(QVariant point){
     double ids = m_nbSommets;
 
     QSqlQuery addSXYZ;
-    addSXYZ.prepare("INSERT INTO SXYZ (SX, SY, SZ, GEOM, DEG, IDS) "
-                    "VALUES (ST_X(:GEOM), ST_Y(:GEOM), ST_Z(:GEOM), :GEOM, 1, :IDS);");
+    addSXYZ.prepare("INSERT INTO SXYZ (GEOM, DEG, IDS) "
+                    "VALUES (:GEOM, 1, :IDS);");
     addSXYZ.bindValue(":IDS",QVariant(ids));
     addSXYZ.bindValue(":GEOM",point);
 
@@ -165,7 +165,7 @@ bool Graphe::build_SIF(QSqlQueryModel* arcs_bruts){
         //CREATION DE LA TABLE SIF D'ACCUEIL DEFINITIVE
 
         QSqlQueryModel createTableSIF;
-        createTableSIF.setQuery("CREATE TABLE SIF ( IDA SERIAL NOT NULL PRIMARY KEY, SI bigint, SF bigint, AZIMUTH_I double precision, AZIMUTH_F double precision, "
+        createTableSIF.setQuery("CREATE TABLE SIF ( IDA SERIAL NOT NULL PRIMARY KEY, SI bigint, SF bigint, GEOM geometry, AZIMUTH_I double precision, AZIMUTH_F double precision, "
                                 "FOREIGN KEY (SI) REFERENCES SXYZ(IDS), "
                                 "FOREIGN KEY (SF) REFERENCES SXYZ(IDS) );");
 
@@ -180,6 +180,7 @@ bool Graphe::build_SIF(QSqlQueryModel* arcs_bruts){
             int ida = arcs_bruts->record(i).value("IDA").toInt();
             QVariant point_si = arcs_bruts->record(i).value("POINT_SI");
             QVariant point_sf = arcs_bruts->record(i).value("POINT_SF");
+            QVariant geom = arcs_bruts->record(i).value("GEOM");
 
             //IDENTIFICATION DES SOMMETS SI ET SF DANS LA TABLE DES SOMMETS
             int id_si = this->find_ids(point_si);
@@ -191,10 +192,11 @@ bool Graphe::build_SIF(QSqlQueryModel* arcs_bruts){
 
             //SAUVEGARDE EN BASE
             QSqlQuery addInSIF;
-            addInSIF.prepare("INSERT INTO SIF(IDA, SI, SF, AZIMUTH_I, AZIMUTH_F) VALUES (:IDA, :SI, :SF, :AI, :AF);");
+            addInSIF.prepare("INSERT INTO SIF(IDA, SI, SF, AZIMUTH_I, AZIMUTH_F, GEOM) VALUES (:IDA, :SI, :SF, :AI, :AF, :GEOM);");
             addInSIF.bindValue(":IDA",QVariant(ida));
             addInSIF.bindValue(":SI",QVariant(id_si));
             addInSIF.bindValue(":SF",QVariant(id_sf));
+            addInSIF.bindValue(":GEOM",QVariant(geom));
             addInSIF.bindValue(":AI",arcs_bruts->record(i).value("AZIMUTH_I").toDouble() * 180.0 / PI);
             addInSIF.bindValue(":AF",arcs_bruts->record(i).value("AZIMUTH_F").toDouble() * 180.0 / PI);
 
@@ -413,137 +415,6 @@ bool Graphe::build_ANGLES(){
     return true;
 }
 
-//***************************************************************************************************************************************************
-//CONSTRUCTION DES TABLES AXYZ, PAXYZ
-//
-//***************************************************************************************************************************************************
-
-bool Graphe::build_P_AXYZ(QSqlQueryModel* arcs_bruts){
-
-
-    if (! pDatabase->tableExists("AXYZ") || ! pDatabase->tableExists("PAXYZ")) {
-
-        pLogger->INFO("------------------------ build_P_AXYZ START --------------------------");
-
-        //CREATION DES TABLES AXYZ ET PAXYZ D'ACCUEIL DEFINITIVES
-
-        QSqlQueryModel createtable_axyz;
-        createtable_axyz.setQuery("CREATE TABLE AXYZ (IDA SERIAL NOT NULL PRIMARY KEY, LI bigint, LF bigint, GEOM geometry, FOREIGN KEY (IDA) REFERENCES SIF(IDA) );");
-
-        if (createtable_axyz.lastError().isValid()) {
-            pLogger->ERREUR(QString("createtable_axyz : %1").arg(createtable_axyz.lastError().text()));
-            return false;
-        }//end if : test requête QSqlQueryModel
-
-        QSqlQueryModel createtable_paxyz;
-        createtable_paxyz.setQuery("CREATE TABLE PAXYZ (IDPA SERIAL NOT NULL PRIMARY KEY, PAX double precision, PAY double precision, PAZ double precision );");
-
-        if (createtable_paxyz.lastError().isValid()) {
-            pLogger->ERREUR(QString("createtable_paxyz : %1").arg(createtable_paxyz.lastError().text()));
-            return false;
-        }//end if : test requête QSqlQueryModel
-
-        //EXTRACTION DES DONNEES
-
-        //initialisation du pointeur de ligne dans paxyz
-        int li_paxyz = 0;
-        int lf_paxyz = 0;
-
-
-        QSqlQuery addInAXYZ;
-        addInAXYZ.prepare("INSERT INTO AXYZ (IDA, LI, LF, GEOM) VALUES (:IDA, :LI, :LF, :GEOM);");
-
-        for(int i=0; i<m_nbArcs; i++){
-
-            //identifiant de l'arc
-            int ida = arcs_bruts->record(i).value("IDA").toInt();
-
-            //géométrie de l'arc
-            QVariant geomArcs = arcs_bruts->record(i).value("GEOM");
-
-            //nombre de points annexes de l'arc
-            int num_points = arcs_bruts->record(i).value("NUMPOINTS").toInt();
-
-            //Si pas de point annexe sur l'arc traité
-            if (num_points == 2) {
-                addInAXYZ.bindValue(":IDA",ida);
-                addInAXYZ.bindValue(":LI",0);
-                addInAXYZ.bindValue(":LF",0);
-                addInAXYZ.bindValue(":GEOM",geomArcs);
-
-                if (! addInAXYZ.exec()) {
-                    pLogger->ERREUR(QString("Impossible d'inserer l'arc %1 dans AXYZ. / record : %2").arg(ida).arg(i));
-                    pLogger->ERREUR(addInAXYZ.lastError().text());
-                    return false;
-                }
-
-                continue;
-            }
-
-            //ligne finale dans PAXYZ = ligne initiale dans PAXYZ + nb de points -1
-            lf_paxyz = li_paxyz + (num_points-2) -1;
-
-            //SAUVEGARDE EN BASE DES VALEURS DE AXYZ
-            addInAXYZ.bindValue(":IDA",ida);
-            addInAXYZ.bindValue(":LI",li_paxyz);
-            addInAXYZ.bindValue(":LF",lf_paxyz);
-            addInAXYZ.bindValue(":GEOM",geomArcs);
-
-            if (! addInAXYZ.exec()) {
-                pLogger->ERREUR(QString("Impossible d'inserer l'arc %1 dans AXYZ. / record : %2").arg(ida).arg(i));
-                pLogger->ERREUR(addInAXYZ.lastError().text());
-                return false;
-            }
-
-            for (int j=2; j<num_points; j++){
-
-                //on sélectionne le j(ième) point du i(ième) arc.
-                QSqlQuery addInPAXYZ;
-                addInPAXYZ.prepare("INSERT INTO PAXYZ (PAX, PAY, PAZ) VALUES "
-                                  "(ST_X(ST_PointN(:GEOM1,:N1)), "
-                                  "ST_Y(ST_PointN(:GEOM2,:N2)), "
-                                  "ST_Z(ST_PointN(:GEOM3,:N3)));");
-
-                addInPAXYZ.bindValue(":GEOM1",geomArcs);
-                addInPAXYZ.bindValue(":GEOM2",geomArcs);
-                addInPAXYZ.bindValue(":GEOM3",geomArcs);
-                addInPAXYZ.bindValue(":N1",j);
-                addInPAXYZ.bindValue(":N2",j);
-                addInPAXYZ.bindValue(":N3",j);
-
-                if (! addInPAXYZ.exec()) {
-                    pLogger->ERREUR(QString("Impossible d'inserer le point annexe %1 dans PAXYZ. / record : %2").arg(li_paxyz+j).arg(j));
-                    pLogger->ERREUR(addInPAXYZ.lastError().text());
-                    return false;
-                }
-
-            }//endforj
-
-            li_paxyz = lf_paxyz +1;
-
-        }//endfori
-
-        pLogger->INFO("------------------------- build_P_AXYZ END ---------------------------");
-
-    } else {
-        pLogger->INFO("--------------------- AXYZ et PAXYZ already exist --------------------");
-    }
-
-    QSqlQueryModel nbPointsAnnexes;
-    nbPointsAnnexes.setQuery("SELECT COUNT(*) AS nb FROM PAXYZ; ");
-
-    if (nbPointsAnnexes.lastError().isValid()) {
-        pLogger->ERREUR(QString("Impossible de récupérer le nombre de points annexes : %1").arg(nbPointsAnnexes.lastError().text()));
-        return false;
-    }//end if : test requête QSqlQueryModel
-
-    m_nbPointsAnnexes = nbPointsAnnexes.record(0).value("nb").toInt();
-
-    pLogger->INFO(QString("Nombre de points annexes : %1").arg(m_nbPointsAnnexes));
-
-    return true;
-
-}// END build_arcs
 
 //***************************************************************************************************************************************************
 //CONSTRUCTION DU TABLEAU DE VECTEURS M_SOMARCS
@@ -799,21 +670,6 @@ bool Graphe::do_Graphe(QString brutArcsTableName){
         return false;
     }
 
-    if (! build_P_AXYZ(arcs_bruts)) {
-        if (! pDatabase->dropTable("AXYZ")) {
-            pLogger->ERREUR("build_P_AXYZ en erreur, ROLLBACK (drop AXYZ) échoué");
-        } else {
-            pLogger->INFO("build_P_AXYZ en erreur, ROLLBACK (drop AXYZ) réussi");
-        }
-
-        if (! pDatabase->dropTable("PAXYZ")) {
-            pLogger->ERREUR("build_P_AXYZ en erreur, ROLLBACK (drop PAXYZ) échoué");
-        } else {
-            pLogger->INFO("build_P_AXYZ en erreur, ROLLBACK (drop PAXYZ) réussi");
-        }
-        return false;
-    }
-
     delete arcs_bruts;
 
     //construction des matrices attributs membres des arcs
@@ -855,222 +711,6 @@ bool Graphe::getSommetsOfArcs(int ida, int* si, int* sf) {
 
     return true;
 }
-
-/*bool Graphe::build_ArcsAzFromSommet(int ids, int buffer, float* tabAzArcs) {
-
-    //, int* ida, float* azi, float* azf, float* dist
-
-    //extraction de la géométrie du sommet ------------------------------------------------------------------------------
-
-    QSqlQueryModel GeomFromSXYZ;
-
-    QSqlQuery querySxyz;
-    querySxyz.prepare("SELECT GEOM FROM SXYZ WHERE IDS = :IDS ;");
-    querySxyz.bindValue(":IDS",ids);
-
-    GeomFromSXYZ.setQuery(querySxyz);
-
-    if (GeomFromSXYZ.lastError().isValid()) {
-        pLogger->ERREUR(QString("Impossible de recuperer des infos (SXYZ) : %1").arg(GeomFromSXYZ.lastError().text()));
-        return false;
-    }//end if : test requete QSqlQueryModel
-
-    if(GeomFromSXYZ.rowCount() != 1){
-        pLogger->ERREUR("Le nombre de réponses ne correspond pas. ");
-        return false;
-    }
-
-   QString idsGeom = GeomFromSXYZ.record(0).value("GEOM").toString();
-
-
-   //sélection des sommets voisins ------------------------------------------------------------------------------
-
-   QSqlQueryModel GeomVoisFromSXYZ;
-
-   QSqlQuery queryVoisSxyz;
-   queryVoisSxyz.prepare("SELECT IDS FROM SXYZ WHERE ST_Distance(GEOM, :IDSGEOM) < :BUFFER ;");
-   queryVoisSxyz.bindValue(":IDSGEOM",idsGeom);
-   queryVoisSxyz.bindValue(":BUFFER",buffer);
-
-   GeomVoisFromSXYZ.setQuery(queryVoisSxyz);
-
-   if (GeomVoisFromSXYZ.lastError().isValid()) {
-       pLogger->ERREUR(QString("Impossible de recuperer des infos pour les voisins (SXYZ) : %1").arg(GeomVoisFromSXYZ.lastError().text()));
-       return false;
-   }//end if : test requete QSqlQueryModel
-
-   //nombre de voisins
-   int nbVois = GeomVoisFromSXYZ.rowCount();
-
-   //tableau des voisins
-   int idsVois[nbVois];
-   for(int i = 0; i < nbVois; i++){
-       //tableau des sommets voisin du sommet ids
-       idsVois[i] = GeomFromSXYZ.record(i).value("IDS").toInt();
-   }
-
-   //tableau des arcs (tous !)
-   float tabAzArcs[m_nbArcs + 1];
-   for(int i = 0; i < m_nbArcs + 1; i++){
-       //tableau des sommets voisin du sommet ids
-       tabAzArcs[i] = -1.0;
-   }
-
-   //pour chaque voisin
-   for(int v = 0; v < nbVois; v++){
-
-       //sélection de l'azimut des arcs arrivant sur le sommet voisin ------------------------------------------------------------------------------
-       //on rempli le tableau d'arcs avec les azimuths trouvés
-
-       QSqlQueryModel AzimFromSIF_SI;
-
-       QSqlQuery querySif_i;
-       querySif_i.prepare("SELECT IDA, azimuth_i FROM SIF WHERE SI =  :IDS;");
-       querySif_i.bindValue(":IDS",idsVois[v]);
-
-       AzimFromSIF_SI.setQuery(querySif_i);
-
-       if (AzimFromSIF_SI.lastError().isValid()) {
-           pLogger->ERREUR(QString("Impossible de recuperer des infos pour les azimuths (SIF) : %1").arg(AzimFromSIF_SI.lastError().text()));
-           return false;
-       }//end if : test requete QSqlQueryModel
-
-       //il peut y avoir plusieurs azimuts (plusieurs arcs) pour un sommet
-       int nbAzim_i = AzimFromSIF_SI.rowCount();
-
-       for(int az = 0; az < nbAzim_i; az++){
-
-           int ida = AzimFromSIF_SI.record(az).value("IDA").toInt();
-
-           if(tabAzArcs[ida] == -1){
-
-               tabAzArcs[ida] = AzimFromSIF_SI.record(az).value("azimuth_i").toFloat();
-           }
-           else{ pLogger->ATTENTION(QString("deux azimuths trouvés pour l'arc : %1").arg(ida));}
-
-       }//end for az
-
-       QSqlQueryModel AzimFromSIF_SF;
-
-       QSqlQuery querySif_f;
-       querySif_f.prepare("SELECT IDA, azimuth_f FROM SIF WHERE SF =  :IDS;");
-       querySif_f.bindValue(":IDS",idsVois[v]);
-
-       AzimFromSIF_SF.setQuery(querySif_f);
-
-       if (AzimFromSIF_SF.lastError().isValid()) {
-           pLogger->ERREUR(QString("Impossible de recuperer des infos pour les azimuths (SIF) : %1").arg(AzimFromSIF_SF.lastError().text()));
-           return false;
-       }//end if : test requete QSqlQueryModel
-
-       //il peut y avoir plusieurs azimuts (plusieurs arcs) pour un sommet
-       int nbAzim_f = AzimFromSIF_SF.rowCount();
-
-       for(int az = 0; az < nbAzim_f; az++){
-
-           int ida = AzimFromSIF_SF.record(az).value("IDA").toInt();
-
-           if(tabAzArcs[ida] == -1){
-
-               tabAzArcs[ida] = AzimFromSIF_SF.record(az).value("azimuth_f").toFloat();
-           }
-            else{ pLogger->ATTENTION(QString("deux azimuths trouvés pour l'arc' : %1").arg(ida));}
-
-       }//end for az
-
-
-
-       //-->> on obtient un tableau, tabAzArcs où les lignes des ida des arcs voisins sont remplies avec l'azimuth des arcs
-
-
-
-*/
-
-
-
-
-
-       /*int idsVois[nbAzim];
-
-       for(int i = 0; i < nbAzim; i++){
-           //tableau des sommets voisin du sommet ids
-           idsVois[i] = GeomFromSXYZ.record(i).value("IDS").toInt();
-       }
-
-    }//end for i*/
-
-
-
-
-
-
-
-    /*QSqlQuery querySxyz;
-    querySxyz.prepare("SELECT GEOM FROM SXYZ WHERE IDS = :IDS ;");
-    querySxyz.bindValue(":IDS", ids);
-
-    if (! querySxyz.exec()) {
-        pLogger->ERREUR(QString("Récupération des infos (SXYZ) du sommet %1").arg(ids));
-        return false;
-    }
-
-    querySxyz.next();
-
-    QString idsGeom = querySxyz.record().value(0).toString();*/
-
-    //recherche des arcs candidats
-
-   /*QSqlQueryModel IdaFromAXYZ;
-
-   QString queryAxyz = QString(("SELECT GEOM FROM SXYZ WHERE IDS = %1 ;").arg(ids));
-
-   GeomFromSXYZ.setQuery(querySxyz);
-
-   if (GeomFromSXYZ.lastError().isValid()) {
-       pLogger->ERREUR(QString("Impossible de recuperer des infos (SXYZ) : %1").arg(GeomFromSXYZ->lastError().text()));
-       return false;
-   }//end if : test requete QSqlQueryModel
-
-   if(GeomFromSXYZ.rowCount() != 1){
-       pLogger->ERREUR("Le nombre de réponses ne correspond pas. ");
-       return false;
-   }
-
-   QString idsGeom = GeomFromSXYZ.record(0).value("GEOM").toString();
-
-    QSqlQuery queryAxyz;
-    queryAxyz.prepare("SELECT IDA, ST_Distance(GEOM, :IDSGEOM) FROM AXYZ WHERE ST_Distance(GEOM, :IDSGEOM) < :D ;");
-    queryAxyz.bindValue(":IDSGEOM", idsGeom);
-    queryAxyz.bindValue(":D", seuil);
-
-    if (! queryAxyz.exec()) {
-        pLogger->ERREUR(QString("Récupération des infos (AXYZ) du sommet %1").arg(ids));
-        return false;
-    }
-
-    //nombre de résulats :
-
-    queryAxyz.next();
-
-    *ida = queryAxyz.record().value(0).toInt();
-    *dist = queryAxyz.record().value(1).toFloat();
-
-    QSqlQuery querySif;
-    querySif.prepare("SELECT azimuth_i, azimuth_f FROM SIF WHERE IDA = :IDA ;");
-    querySif.bindValue(":IDA", *ida);
-
-    if (! querySif.exec()) {
-        pLogger->ERREUR(QString("Récupération des infos (SIF) du sommet %1").arg(ids));
-        return false;
-    }
-
-    querySif.next();
-
-    *azi = querySif.record().value(0).toFloat();
-    *azf = querySif.record().value(1).toFloat();*/
-
-/*    return true;
-}*/
 
 double Graphe::getAngle(int ids, int ida1, int ida2) {
     QSqlQuery queryAngle;

@@ -16,8 +16,7 @@ namespace WayMethods {
         ANGLE_MIN = 0,
         ANGLE_SOMME_MIN = 1,
         ANGLE_RANDOM = 2,
-        ARCS = 3,
-        AZIMUT = 4
+        ARCS = 3
     };
 
     extern int numMethods;
@@ -49,7 +48,6 @@ private:
     bool findCouplesAngleSommeMin(int ids, int N_couples, int pos_couple, int lsom, int pos_ut, QVector< QVector<bool> >* V_utArcs, QVector< QVector<double> >* V_sommeArc, int nb_possib);
     bool findCouplesRandom(int ids);
     bool findCouplesArcs(int ids);
-    bool findCouplesAzimut(int ids, int seuil);
 
     //---construction des couples
     bool buildCouples(int seuil);

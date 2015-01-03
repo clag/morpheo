@@ -363,38 +363,6 @@ bool Voies::findCouplesArcs(int ids)
 }// end findArcs
 
 
-// On fait un couple en fonction de la direction des arcs
-/*bool Voies::findCouplesAzimut(int ids, int buffer)
-{
-    QVector<long>* arcs = m_Graphe->getArcsOfSommet(ids);
-
-    if (arcs->size() == 2){
-
-        long a1 = arcs->at(0);
-        long a2 = arcs->at(1);
-
-        m_Couples[a1].push_back(ids);
-        m_Couples[a1].push_back(a2);
-        m_Couples[a2].push_back(ids);
-        m_Couples[a2].push_back(a1);
-        m_nbCouples++;
-
-    }
-    else{
-
-        for (int i=0; i<arcs->size(); i++){
-             long a = arcs->at(i);
-
-             m_Couples[a].push_back(ids);
-             m_Couples[a].push_back(0); //on l'ajoute comme arc terminal (en couple avec 0)
-             m_Impasses.push_back(a); // Ajout comme impasse
-             m_nbCelibataire++;
-        }
-
-    }
-
-    return true;
-}// end findCouplesAzimut*/
 
 bool Voies::buildCouples(int buffer){
 
@@ -572,10 +540,6 @@ bool Voies::buildCouples(int buffer){
                 case WayMethods::ARCS:
                     if (! findCouplesArcs(ids)) return false;
                     break;
-
-                //case WayMethods::AZIMUT:
-                //    if (! findCouplesAzimut(ids, buffer)) return false;
-                //    break;
 
                 default:
                     pLogger->ERREUR("Methode d'appariement des arcs inconnu");
@@ -810,6 +774,11 @@ bool Voies::build_VOIES(){
                 pLogger->ERREUR("Impossible de supprimer VOIES, pour la recreer avec la bonne methode");
                 return false;
             }
+
+            if (! pDatabase->dropTable("DTOPO_VOIES")) {
+                pLogger->ERREUR("Impossible de supprimer DTOPO_VOIES, pour la recreer avec la bonne methode");
+                return false;
+            }
         }
     }
 
@@ -858,7 +827,7 @@ bool Voies::build_VOIES(){
 
         QSqlQueryModel *geometryArcs = new QSqlQueryModel();
 
-        geometryArcs->setQuery("SELECT IDA AS IDA, GEOM AS GEOM FROM AXYZ;");
+        geometryArcs->setQuery("SELECT IDA AS IDA, GEOM AS GEOM FROM SIF;");
 
         if (geometryArcs->lastError().isValid()) {
             pLogger->ERREUR(QString("req_arcsvoies : %1").arg(geometryArcs->lastError().text()));
@@ -1008,14 +977,6 @@ bool Voies::calcStructuralite(){
             return false;
         }
 
-        //CREATION DU TABLEAU DONNANT LA LONGUEUR DE CHAQUE VOIE
-        /*float length_voie[m_nbVoies + 1];
-        for(int v = 0; v < m_nbVoies; v++){
-            int idv = lengthFromVOIES->record(v).value("IDV").toInt();
-            length_voie[idv]=lengthFromVOIES->record(v).value("LENGTH_VOIE").toFloat();
-            m_length_tot += length_voie[idv];
-        }//end for v*/
-
         //open the file
         ofstream lengthfile;
         lengthfile.open("length.txt");
@@ -1057,7 +1018,7 @@ bool Voies::calcStructuralite(){
         adjacencyfile.open("adjacency.txt");
         //adjacencyfile << "[";
 
-        for(int idv1 = 1; idv1 < m_nbVoies + 1; idv1 ++){
+        for(int idv1 = 1; idv1 < m_nbVoies + 1; idv1 ++) {
 
             pLogger->DEBUG(QString("*** VOIE V : %1").arg(idv1));
             pLogger->DEBUG(QString("*** LENGTH : %1").arg(length_voie[idv1]));
@@ -1088,7 +1049,7 @@ bool Voies::calcStructuralite(){
            //-------------------
 
             //TRAITEMENT
-            while(nb_voiestraitees != m_nbVoies){
+            while(nb_voiestraitees != m_nbVoies) {
 
                 //cout<<endl<<"nb_voiestraitees : "<<nb_voiestraitees<<" / "<<m_nbVoies<<" voies."<<endl;
                 nb_voiestraitees_test = nb_voiestraitees;
@@ -1162,6 +1123,35 @@ bool Voies::calcStructuralite(){
                 dtopo += 1;
 
             }//end while (voies a traitees)
+
+            // On rend persistent toutes les structuralités calculées
+            if (! pDatabase->tableExists("DTOPO_VOIES")) {
+
+                //CREATION DE LA TABLE DTOPO_VOIES
+
+                QSqlQueryModel createTableDTOPO_VOIES;
+                createTableDTOPO_VOIES.setQuery("CREATE TABLE DTOPO_VOIES ( IDV1 bigint, IDV2 bigint, DTOPO integer, "
+                                        "FOREIGN KEY (IDV1) REFERENCES VOIES(IDV), "
+                                        "FOREIGN KEY (IDV2) REFERENCES VOIES(IDV) );");
+                if (createTableDTOPO_VOIES.lastError().isValid()) {
+                    pLogger->ERREUR(QString("createTableDTOPO_VOIES : %1").arg(createTableDTOPO_VOIES.lastError().text()));
+                    return false;
+                }//end if : test requête QSqlQueryModel
+            }
+
+            for (int vdtopo = idv1 + 1; vdtopo <= m_nbVoies; vdtopo++) {
+                if (dtopo_voies[vdtopo] != -1) {
+                    QString addDTopo = QString("INSERT INTO DTOPO_VOIES(IDV1, IDV2, DTOPO) VALUES (%1, %2, %3);").arg(idv1).arg(vdtopo).arg(dtopo_voies[vdtopo]);
+
+                    QSqlQuery addInDTopo;
+                    addInDTopo.prepare(addDTopo);
+
+                    if (! addInDTopo.exec()) {
+                        pLogger->ERREUR(QString("Impossible d'ajouter la distance topologique entre la voie %1 et %2 dans la table DTOPO_VOIES : %2").arg(idv1).arg(vdtopo).arg(addInDTopo.lastError().text()));
+                        return false;
+                    }
+                }
+            }
 
 
             //CALCUL DE LA STRUCTURALITE

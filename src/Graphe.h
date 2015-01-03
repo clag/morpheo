@@ -54,9 +54,6 @@ private:
     //---construction de ANGLES
     bool build_ANGLES();
 
-    //---construction de AXYZ, PAXYZ
-    bool build_P_AXYZ(QSqlQueryModel* arcs_bruts);
-
     //---construction des tableaux membres
     bool build_SomArcs();
     bool build_ArcArcs();
