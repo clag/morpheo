@@ -24,7 +24,7 @@
      </rect>
     </property>
     <property name="currentIndex">
-     <number>0</number>
+     <number>1</number>
     </property>
     <widget class="QWidget" name="databseTab">
      <attribute name="title">
@@ -177,7 +177,7 @@
       <property name="geometry">
        <rect>
         <x>10</x>
-        <y>130</y>
+        <y>170</y>
         <width>851</width>
         <height>31</height>
        </rect>
@@ -324,7 +324,7 @@
         <x>690</x>
         <y>20</y>
         <width>131</width>
-        <height>91</height>
+        <height>131</height>
        </rect>
       </property>
       <property name="title">
@@ -336,7 +336,7 @@
          <x>9</x>
          <y>17</y>
          <width>111</width>
-         <height>74</height>
+         <height>111</height>
         </rect>
        </property>
        <layout class="QVBoxLayout" name="attributesVerticalLayout">
@@ -366,7 +366,17 @@
            <string>Inclusion</string>
           </property>
           <property name="checked">
-           <bool>false</bool>
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QCheckBox" name="gradientCheckBox">
+          <property name="text">
+           <string>Gradient</string>
+          </property>
+          <property name="checked">
+           <bool>true</bool>
           </property>
          </widget>
         </item>

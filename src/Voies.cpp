@@ -1307,7 +1307,7 @@ bool Voies::calcConnexion(){
     if (! pDatabase->columnExists("VOIES", "NBCSIN") || ! pDatabase->columnExists("VOIES", "NBCSIN_P")) {
         pLogger->INFO("---------------------- calcConnexion START ----------------------");
 
-        // AJOUT DE L'ATTRIBUT DE CONNEXION
+        // AJOUT DE L'ATTRIBUT DE CONNEXION == ORTHOGONALITE
         QSqlQueryModel addNbcsinInVOIES;
         addNbcsinInVOIES.setQuery("ALTER TABLE VOIES ADD NBCSIN float, ADD NBCSIN_P float;");
 
@@ -1975,7 +1975,7 @@ bool Voies::calcInclusion(){
         structFromVOIES->setQuery("SELECT IDV, STRUCT AS STRUCT_VOIE FROM VOIES;");
 
         if (structFromVOIES->lastError().isValid()) {
-            pLogger->ERREUR(QString("Impossible de recuperer les structuralites dans VOIES : %1").arg(structFromVOIES->lastError().text()));
+            pLogger->ERREUR(QString("Impossible de recuperer les structuralites dans VOIES pour calculer l'inclusion: %1").arg(structFromVOIES->lastError().text()));
             return false;
         }//end if : test requete QSqlQueryModel
 
@@ -2009,7 +2009,7 @@ bool Voies::calcInclusion(){
 
 
             if(m_VoieVoies.at(idv1).size() != 0) {inclusion_moy = inclusion / m_VoieVoies.at(idv1).size();}
-            else {inclusion_moy = inclusion;}
+            else {inclusion_moy = 0;}
 
             //INSERTION EN BASE
             QSqlQuery addInclAttInVOIES;
@@ -2028,7 +2028,6 @@ bool Voies::calcInclusion(){
 
         if (! pDatabase->add_att_cl("VOIES", "CL_INCL", "INCL", 10, true)) return false;
         if (! pDatabase->add_att_cl("VOIES", "CL_INCLMOY", "INCL_MOY", 10, true)) return false;
-        if (! pDatabase->add_att_difABS("VOIES", "DIFF_STIN", "CL_S", "CL_INCLMOY")) return false;
 
         pLogger->INFO(QString("STRUCTURALITE TOTALE SUR LE RESEAU : %1").arg(m_struct_tot));
 
@@ -2039,6 +2038,111 @@ bool Voies::calcInclusion(){
     return true;
 
 }//END calcInclusion
+
+bool Voies::calcGradient(){
+
+    if (! pDatabase->columnExists("VOIES", "GRAD") || ! pDatabase->columnExists("VOIES", "GRAD_MOY")) {
+        pLogger->INFO("---------------------- calcGradient START ----------------------");
+
+        // AJOUT DE L'ATTRIBUT DE GRADIENT
+        QSqlQueryModel addGradlInVOIES;
+        addGradlInVOIES.setQuery("ALTER TABLE VOIES ADD GRAD float, ADD GRAD_MOY float;");
+
+        if (addGradlInVOIES.lastError().isValid()) {
+            pLogger->ERREUR(QString("Impossible d'ajouter les attributs de gradient dans VOIES : %1").arg(addGradlInVOIES.lastError().text()));
+            return false;
+        }
+
+        QSqlQueryModel *structFromVOIES = new QSqlQueryModel();
+
+        structFromVOIES->setQuery("SELECT IDV, STRUCT AS STRUCT_VOIE FROM VOIES;");
+
+        if (structFromVOIES->lastError().isValid()) {
+            pLogger->ERREUR(QString("Impossible de recuperer les structuralites dans VOIES pour calculer le gradient : %1").arg(structFromVOIES->lastError().text()));
+            return false;
+        }//end if : test requete QSqlQueryModel
+
+        //CREATION DU TABLEAU DONNANT LA STRUCTURALITE DE CHAQUE VOIE
+        float struct_voie[m_nbVoies + 1];
+
+        for(int i = 0; i < m_nbVoies + 1; i++){
+            struct_voie[i] = 0;
+        }
+
+        for(int v = 0; v < m_nbVoies; v++){
+            int idv = structFromVOIES->record(v).value("IDV").toInt();
+            struct_voie[idv]=structFromVOIES->record(v).value("STRUCT_VOIE").toFloat();
+            m_struct_tot += struct_voie[idv];
+        }//end for v
+
+        //SUPPRESSION DE L'OBJET
+        delete structFromVOIES;
+
+        //***********************************************Calcul du gradient :
+
+        for(int idv0 = 1; idv0 < m_nbVoies + 1; idv0++){
+
+            float gradient = 0;
+            int size_idv3 = 0;
+            float gradient_moy = 0;
+
+            //on cherche toutes les voies connectées à idv0
+            for (int v1 = 0; v1 < m_VoieVoies.at(idv0).size(); v1 ++) {
+                long idv1 = m_VoieVoies.at(idv0).at(v1);
+
+                //on cherche toutes les voies connectées à idv1
+                for (int v2 = 0; v2 < m_VoieVoies.at(idv1).size(); v2 ++) {
+                    long idv2 = m_VoieVoies.at(idv1).at(v2);
+
+                    //on cherche toutes les voies connectées à idv2
+                    for (int v3 = 0; v3 < m_VoieVoies.at(idv2).size(); v3 ++) {
+                        long idv3 = m_VoieVoies.at(idv2).at(v3);
+
+                        if (struct_voie[idv0]-struct_voie[idv3]>gradient){
+                            gradient = struct_voie[idv0]-struct_voie[idv3];
+                        }
+                        size_idv3 += 1;
+
+
+                    }//end for idv3
+
+
+                }//end for idv2
+
+
+            }//end for idv1
+
+
+            if(size_idv3 != 0) {gradient_moy = gradient / size_idv3;}
+            else {gradient_moy = 0;}
+
+            //INSERTION EN BASE
+            QSqlQuery addInclAttInVOIES;
+            addInclAttInVOIES.prepare("UPDATE VOIES SET GRAD = :GRAD, GRAD_MOY = :GRAD_MOY WHERE idv = :IDV ;");
+            addInclAttInVOIES.bindValue(":IDV",idv0 );
+            addInclAttInVOIES.bindValue(":GRAD",gradient);
+            addInclAttInVOIES.bindValue(":GRAD_MOY",gradient_moy);
+
+            if (! addInclAttInVOIES.exec()) {
+                pLogger->ERREUR(QString("Impossible d'inserer le gradient %1 et le gradient moyenne %2 pour la voie %3").arg(gradient).arg(gradient_moy).arg(idv0));
+                pLogger->ERREUR(addInclAttInVOIES.lastError().text());
+                return false;
+            }
+
+        }//end for idv0
+
+        if (! pDatabase->add_att_cl("VOIES", "CL_GRAD", "GRAD", 10, true)) return false;
+        if (! pDatabase->add_att_cl("VOIES", "CL_GRADMOY", "GRAD_MOY", 10, true)) return false;
+
+        pLogger->INFO(QString("STRUCTURALITE TOTALE SUR LE RESEAU : %1").arg(m_struct_tot));
+
+    } else {
+        pLogger->INFO("---------------- Grad attributes already in VOIES -----------------");
+    }
+
+    return true;
+
+}//END calcGradient
 
 
 
@@ -2296,7 +2400,7 @@ bool Voies::do_Voies(int buffer){
 //
 //***************************************************************************************************************************************************
 
-bool Voies::do_Att_Voie(bool connexion, bool use, bool inclusion){
+bool Voies::do_Att_Voie(bool connexion, bool use, bool inclusion, bool gradient){
 
     // Calcul de la structuralite
     if (! calcStructuralite()) {
@@ -2326,19 +2430,19 @@ bool Voies::do_Att_Voie(bool connexion, bool use, bool inclusion){
     //calcul des angles de connexions (orthogonalité)
     if (connexion && ! calcConnexion()) {
         if (! pDatabase->dropColumn("VOIES", "NBCSIN")) {
-            pLogger->ERREUR("calcInclusion en erreur, ROLLBACK (drop column NBCSIN) echoue");
+            pLogger->ERREUR("calcConnexion en erreur, ROLLBACK (drop column NBCSIN) echoue");
         } else {
-            pLogger->INFO("calcInclusion en erreur, ROLLBACK (drop column NBCSIN) reussi");
+            pLogger->INFO("calcConnexion en erreur, ROLLBACK (drop column NBCSIN) reussi");
         }
         if (! pDatabase->dropColumn("VOIES", "NBCSIN_P")) {
-            pLogger->ERREUR("calcInclusion en erreur, ROLLBACK (drop column NBCSIN_P) echoue");
+            pLogger->ERREUR("calcConnexion en erreur, ROLLBACK (drop column NBCSIN_P) echoue");
         } else {
-            pLogger->INFO("calcInclusion en erreur, ROLLBACK (drop column NBCSIN_P) reussi");
+            pLogger->INFO("calcConnexion en erreur, ROLLBACK (drop column NBCSIN_P) reussi");
         }
         if (! pDatabase->dropColumn("VOIES", "C_ORTHO")) {
-            pLogger->ERREUR("calcInclusion en erreur, ROLLBACK (drop column C_ORTHO) echoue");
+            pLogger->ERREUR("calcConnexion en erreur, ROLLBACK (drop column C_ORTHO) echoue");
         } else {
-            pLogger->INFO("calcInclusion en erreur, ROLLBACK (drop column C_ORTHO) reussi");
+            pLogger->INFO("calcConnexion en erreur, ROLLBACK (drop column C_ORTHO) reussi");
         }
         return false;
 
@@ -2347,19 +2451,19 @@ bool Voies::do_Att_Voie(bool connexion, bool use, bool inclusion){
     //calcul des utilisation (betweenness)
     if (use && ! calcUse()) {
         if (! pDatabase->dropColumn("VOIES", "USE")) {
-            pLogger->ERREUR("calcStructuralite en erreur, ROLLBACK (drop column USE) echoue");
+            pLogger->ERREUR("calcUse en erreur, ROLLBACK (drop column USE) echoue");
         } else {
-            pLogger->INFO("calcStructuralite en erreur, ROLLBACK (drop column USE) reussi");
+            pLogger->INFO("calcUse en erreur, ROLLBACK (drop column USE) reussi");
         }
         if (! pDatabase->dropColumn("VOIES", "USE_MLT")) {
-            pLogger->ERREUR("calcStructuralite en erreur, ROLLBACK (drop column USE_MLT) echoue");
+            pLogger->ERREUR("calcUse en erreur, ROLLBACK (drop column USE_MLT) echoue");
         } else {
-            pLogger->INFO("calcStructuralite en erreur, ROLLBACK (drop column USE_MLT) reussi");
+            pLogger->INFO("calcUse en erreur, ROLLBACK (drop column USE_MLT) reussi");
         }
         if (! pDatabase->dropColumn("VOIES", "USE_LGT")) {
-            pLogger->ERREUR("calcStructuralite en erreur, ROLLBACK (drop column USE_LGT) echoue");
+            pLogger->ERREUR("calcUse en erreur, ROLLBACK (drop column USE_LGT) echoue");
         } else {
-            pLogger->INFO("calcStructuralite en erreur, ROLLBACK (drop column USE_LGT) reussi");
+            pLogger->INFO("calcUse en erreur, ROLLBACK (drop column USE_LGT) reussi");
         }
         return false;
     }
@@ -2378,6 +2482,22 @@ bool Voies::do_Att_Voie(bool connexion, bool use, bool inclusion){
         }
         return false;
     }
+
+    // Calcul du gradient
+    if (gradient && ! calcGradient()) {
+        if (! pDatabase->dropColumn("VOIES", "GRAD")) {
+            pLogger->ERREUR("calcGradient en erreur, ROLLBACK (drop column GRAD) echoue");
+        } else {
+            pLogger->INFO("calcGradient en erreur, ROLLBACK (drop column GRAD) reussi");
+        }
+        if (! pDatabase->dropColumn("VOIES", "GRAD_MOY")) {
+            pLogger->ERREUR("calcGradient en erreur, ROLLBACK (drop column GRAD_MOY) echoue");
+        } else {
+            pLogger->INFO("calcGradient en erreur, ROLLBACK (drop column GRAD_MOY) reussi");
+        }
+        return false;
+    }
+
 
     //construction de la table VOIES en BDD
     if (! insertINFO()) return false;

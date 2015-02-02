@@ -114,7 +114,7 @@ void MainWindow::calculate() {
 
         ui->statusBar->showMessage("Ways' attributes in progress");
         QApplication::processEvents();
-        if (! voies_courantes->do_Att_Voie(ui->connexionCheckBox->isChecked(), ui->useCheckBox->isChecked(), ui->inclusionCheckBox->isChecked())) {
+        if (! voies_courantes->do_Att_Voie(ui->connexionCheckBox->isChecked(), ui->useCheckBox->isChecked(), ui->inclusionCheckBox->isChecked(), ui->gradientCheckBox->isChecked())) {
             mettreEnErreur("Cannot calculate ways' attributes");
             return;
         }

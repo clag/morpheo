@@ -36,7 +36,7 @@ public:
     bool do_Voies(int buffer = 0);
 
     //---construction des attributs de voies
-    bool do_Att_Voie(bool structurality, bool inclusion, bool connexion);
+    bool do_Att_Voie(bool connexion, bool use, bool inclusion, bool gradient);
 
 
 
@@ -61,6 +61,7 @@ private:
     //---calcul des attributs de voies
     bool calcStructuralite();
     bool calcInclusion();
+    bool calcGradient();
     bool calcConnexion();
     bool calcUse();
 
