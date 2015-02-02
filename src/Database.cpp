@@ -299,15 +299,18 @@ bool Database::add_att_cl(QString table, QString new_att, QString att_1, int nb_
     emit information(QString("Classification de %1 dans %2 : length_tot = %3 et length_autorisee = %4").arg(new_att).arg(table).arg(length_tot).arg(length_autorisee));
 
     QString idname;
+    idname = "IDV";
 
-    if (table == "VOIES") idname = "IDV";
+    emit information(QString("ATTENTION : CLASSIFICATION CONFIGUREE POUR LA TABLE VOIE AVEC IDV !!"));
+
+    /*if (table == "VOIES") idname = "IDV";
     else if (table == "AXYZ" || table == "SIF") idname = "IDA";
     //****
     else {
         idname = "GID";
        // emit fatal(QString("La classification n'est pas prise en compte pour la table %1").arg(table));
        // return false;
-    }
+    }*/
     //****
 
     //CLASSIFICATION
@@ -316,7 +319,7 @@ bool Database::add_att_cl(QString table, QString new_att, QString att_1, int nb_
     else classification.setQuery(QString("SELECT %1 AS ID, length AS LENGTH, %2 AS ATT FROM %3 WHERE %2 >= 0 ORDER BY ATT DESC;").arg(idname).arg(att_1).arg(table));
 
     if (classification.lastError().isValid()) {
-        emit fatal(QString("Impossible de récupérer les objets de la table %1, triés par %2").arg(table).arg(att_1));
+        emit fatal(QString("Impossible de recuperer les objets de la table %1, tries par %2").arg(table).arg(att_1));
         emit fatal(classification.lastError().text());
         return false;
     }

@@ -368,9 +368,13 @@ bool Voies::buildCouples(int buffer){
 
     pLogger->INFO("------------------------- buildCouples START -------------------------");
 
-    //open the file
-    ofstream degreefile;
-    degreefile.open("degree.txt");
+    QString degreefilename=QString("degree_%1.txt").arg(QSqlDatabase::database().databaseName());
+    QFile degreeqfile( degreefilename );
+    if (! degreeqfile.open(QIODevice::ReadWrite) ) {
+        pLogger->ERREUR("Impossible d'ouvrir le fichier où écrire les degrés");
+        return false;
+    }
+    QTextStream degreestream( &degreeqfile );
 
     for(int ids = 1; ids <= m_Graphe->getNombreSommets(); ids++){
         pLogger->DEBUG(QString("Le sommet IDS %1").arg(ids));
@@ -387,10 +391,10 @@ bool Voies::buildCouples(int buffer){
 
         //ECRITURE DU DEGRES DES SOMMETS
         //writing
-        degreefile << ids;
-        degreefile << " ";
-        degreefile << N_arcs;
-        degreefile << endl;
+        degreestream << ids;
+        degreestream << " ";
+        degreestream << N_arcs;
+        degreestream << endl;
 
 
 
@@ -554,7 +558,7 @@ bool Voies::buildCouples(int buffer){
     }//end for s
 
     //close the file
-    degreefile.close();
+    degreeqfile.close();
 
     //NOMBRE DE COUPLES
     pLogger->INFO(QString("Nb TOTAL de Couples : %1").arg(m_nbCouples));
@@ -857,9 +861,13 @@ bool Voies::build_VOIES(){
 
         delete geometryArcs;
 
-
-        ofstream geomfile;
-        geomfile.open("geom.txt");
+        QString geomfilename=QString("geom_%1.txt").arg(QSqlDatabase::database().databaseName());
+        QFile geomqfile( geomfilename );
+        if (! geomqfile.open(QIODevice::ReadWrite) ) {
+            pLogger->ERREUR("Impossible d'ouvrir le fichier où écrire les géométries");
+            return false;
+        }
+        QTextStream geomstream( &geomqfile );
 
 
         // On ajoute toutes les voies, avec la geometrie (multi), le nombre d'arcs, de sommets et la connectivite
@@ -883,10 +891,10 @@ bool Voies::build_VOIES(){
             else { nbc_p = nbc;}
 
 
-            geomfile << idv;
-            geomfile << " ";
-            geomfile << geometryVoies.at(idv).toStdString();
-            geomfile << endl;
+            geomstream << idv;
+            geomstream << " ";
+            geomstream << geometryVoies.at(idv);
+            geomstream << endl;
 
 
 
@@ -903,7 +911,25 @@ bool Voies::build_VOIES(){
 
         }
 
-        geomfile.close();
+        geomqfile.close();
+
+        //On ajoute la voie correspondante à l'arc dans SIF
+
+        for (int ida=1; ida < m_Couples.size(); ida++){
+            int idv = m_Couples.at(ida).at(4);
+
+            QSqlQuery addIDVAttInSIF;
+            addIDVAttInSIF.prepare("UPDATE SIF SET IDV = :IDV WHERE ida = :IDA ;");
+            addIDVAttInSIF.bindValue(":IDV",idv);
+            addIDVAttInSIF.bindValue(":IDA",ida);
+
+            if (! addIDVAttInSIF.exec()) {
+                pLogger->ERREUR(QString("Impossible d'inserer l'identifiant %1 pour l'arc %2").arg(idv).arg(ida));
+                pLogger->ERREUR(addIDVAttInSIF.lastError().text());
+                return false;
+            }
+
+        }
 
         // On calcule la longueur des voies
         QSqlQuery updateLengthInVOIES;
@@ -943,6 +969,60 @@ bool Voies::arcInVoie(long ida, long idv){
 
 }//END arcInVoie
 
+bool Voies::updateSIF(){
+
+    //On ajoute la voie correspondante à l'arc dans SIF
+
+    for (int ida=1; ida < m_Couples.size(); ida++){
+        int idv = m_Couples.at(ida).at(4);
+
+        QSqlQuery addIDVAttInSIF;
+        addIDVAttInSIF.prepare("UPDATE SIF SET IDV = :IDV WHERE ida = :IDA ;");
+        addIDVAttInSIF.bindValue(":IDV",idv);
+        addIDVAttInSIF.bindValue(":IDA",ida);
+
+        if (! addIDVAttInSIF.exec()) {
+            pLogger->ERREUR(QString("Impossible d'inserer l'identifiant %1 pour l'arc %2").arg(idv).arg(ida));
+            pLogger->ERREUR(addIDVAttInSIF.lastError().text());
+            return false;
+        }
+
+    }
+
+    QSqlQueryModel *structFromVOIES = new QSqlQueryModel();
+
+    structFromVOIES->setQuery("SELECT IDV, STRUCT AS STRUCT_VOIE FROM VOIES;");
+
+    if (structFromVOIES->lastError().isValid()) {
+        pLogger->ERREUR(QString("Impossible de recuperer les structuralites dans VOIES : %1").arg(structFromVOIES->lastError().text()));
+        return false;
+    }//end if : test requete QSqlQueryModel
+
+    for(int v = 0; v < m_nbVoies; v++){
+        int idv = structFromVOIES->record(v).value("IDV").toInt();
+        float struct_voie = structFromVOIES->record(v).value("STRUCT_VOIE").toFloat();
+
+
+        QSqlQuery addStructAttInSIF;
+        addStructAttInSIF.prepare("UPDATE SIF SET STRUCT = :ST WHERE idv = :IDV ;");
+        addStructAttInSIF.bindValue(":ST",struct_voie);
+        addStructAttInSIF.bindValue(":IDV",idv);
+
+        if (! addStructAttInSIF.exec()) {
+            pLogger->ERREUR(QString("Impossible d'inserer la structuralité %1 pour la voie %2").arg(struct_voie).arg(idv));
+            pLogger->ERREUR(addStructAttInSIF.lastError().text());
+            return false;
+        }
+
+
+    }//end for v
+
+    //SUPPRESSION DE L'OBJET
+    delete structFromVOIES;
+
+    return true;
+}//END updateSIF
+
 
 //***************************************************************************************************************************************************
 //CALCUL DES ATTRIBUTS
@@ -978,9 +1058,13 @@ bool Voies::calcStructuralite(){
         }
 
         //open the file
-        ofstream lengthfile;
-        lengthfile.open("length.txt");
-        //lengthfile << "[";
+        QString lengthfilename=QString("length_%1.txt").arg(QSqlDatabase::database().databaseName());
+        QFile lengthqfile( lengthfilename );
+        if (! lengthqfile.open(QIODevice::ReadWrite) ) {
+            pLogger->ERREUR("Impossible d'ouvrir le fichier où écrire les longueurs");
+            return false;
+        }
+        QTextStream lengthstream( &lengthqfile );
 
         float length_voie[m_nbVoies + 1];
         for(int v = 0; v < m_nbVoies; v++){
@@ -988,17 +1072,15 @@ bool Voies::calcStructuralite(){
             length_voie[idv]=lengthFromVOIES->record(v).value("LENGTH_VOIE").toFloat();
 
             //writing
-            lengthfile << idv;
-            lengthfile << " ";
-            lengthfile << length_voie[idv];
-            lengthfile << endl;
+            lengthstream << idv;
+            lengthstream << " ";
+            lengthstream << length_voie[idv];
+            lengthstream << endl;
 
             m_length_tot += length_voie[idv];
         }//end for v
 
-        //close the file
-        //lengthfile << "]";
-        lengthfile.close();
+        lengthqfile.close();
 
         //SUPPRESSION DE L'OBJET
         delete lengthFromVOIES;
@@ -1009,14 +1091,22 @@ bool Voies::calcStructuralite(){
         //TRAITEMENT DES m_nbVoies VOIES
 
         //open the file dtopofile
-        ofstream dtopofile;
-        dtopofile.open("dtopo.txt");
-        //dtopofile << "[";
+        QString dtopofilename=QString("dtopo_%1.txt").arg(QSqlDatabase::database().databaseName());
+        QFile dtopoqfile( dtopofilename );
+        if (! dtopoqfile.open(QIODevice::ReadWrite) ) {
+            pLogger->ERREUR("Impossible d'ouvrir le fichier où écrire les distance topographiques");
+            return false;
+        }
+        QTextStream dtopostream( &dtopoqfile );
 
-        //open the file adjacencyfile
-        ofstream adjacencyfile;
-        adjacencyfile.open("adjacency.txt");
-        //adjacencyfile << "[";
+        //open the file
+        QString adjacencyfilename=QString("adjacency_%1.txt").arg(QSqlDatabase::database().databaseName());
+        QFile adjacencyqfile( adjacencyfilename );
+        if (! adjacencyqfile.open(QIODevice::ReadWrite) ) {
+            pLogger->ERREUR("Impossible d'ouvrir le fichier où écrire les adjacences");
+            return false;
+        }
+        QTextStream adjacencystream( &adjacencyqfile );
 
         for(int idv1 = 1; idv1 < m_nbVoies + 1; idv1 ++) {
 
@@ -1125,34 +1215,6 @@ bool Voies::calcStructuralite(){
             }//end while (voies a traitees)
 
             // On rend persistent toutes les structuralités calculées
-            if (! pDatabase->tableExists("DTOPO_VOIES")) {
-
-                //CREATION DE LA TABLE DTOPO_VOIES
-
-                QSqlQueryModel createTableDTOPO_VOIES;
-                createTableDTOPO_VOIES.setQuery("CREATE TABLE DTOPO_VOIES ( IDV1 bigint, IDV2 bigint, DTOPO integer, "
-                                        "FOREIGN KEY (IDV1) REFERENCES VOIES(IDV), "
-                                        "FOREIGN KEY (IDV2) REFERENCES VOIES(IDV) );");
-                if (createTableDTOPO_VOIES.lastError().isValid()) {
-                    pLogger->ERREUR(QString("createTableDTOPO_VOIES : %1").arg(createTableDTOPO_VOIES.lastError().text()));
-                    return false;
-                }//end if : test requête QSqlQueryModel
-            }
-
-            for (int vdtopo = idv1 + 1; vdtopo <= m_nbVoies; vdtopo++) {
-                if (dtopo_voies[vdtopo] != -1) {
-                    QString addDTopo = QString("INSERT INTO DTOPO_VOIES(IDV1, IDV2, DTOPO) VALUES (%1, %2, %3);").arg(idv1).arg(vdtopo).arg(dtopo_voies[vdtopo]);
-
-                    QSqlQuery addInDTopo;
-                    addInDTopo.prepare(addDTopo);
-
-                    if (! addInDTopo.exec()) {
-                        pLogger->ERREUR(QString("Impossible d'ajouter la distance topologique entre la voie %1 et %2 dans la table DTOPO_VOIES : %2").arg(idv1).arg(vdtopo).arg(addInDTopo.lastError().text()));
-                        return false;
-                    }
-                }
-            }
-
 
             //CALCUL DE LA STRUCTURALITE
             for(int l=0; l<V_ordreLength.size(); l++){
@@ -1189,13 +1251,13 @@ bool Voies::calcStructuralite(){
 
             for(int i = 1; i < m_nbVoies + 1; i++){
 
-                dtopofile << dtopo_voies[i];
+                dtopostream << dtopo_voies[i];
 
                 if(dtopo_voies[i] == -1 || dtopo_voies[i] == 0 || dtopo_voies[i] == 1){
-                    adjacencyfile << dtopo_voies[i];
+                    adjacencystream << dtopo_voies[i];
                 }
                 else if(dtopo_voies[i] > 1){
-                    adjacencyfile << 0;
+                    adjacencystream << 0;
                 }
                 else{pLogger->ERREUR(QString("Erreur dans la matrice de distances topologiques"));}
 
@@ -1204,8 +1266,8 @@ bool Voies::calcStructuralite(){
                     adjacencyfile << ", ";
                 }
                 else{*/
-                    dtopofile << " ";
-                    adjacencyfile << " ";
+                    dtopostream << " ";
+                    adjacencystream << " ";
                 //}
 
             }//end for i
@@ -1213,16 +1275,14 @@ bool Voies::calcStructuralite(){
            // dtopofile << "]";
            // adjacencyfile << "]";
 
-            dtopofile << endl;
-            adjacencyfile << endl;
+            dtopostream << endl;
+            adjacencystream << endl;
 
         }//end for idv1
 
-        //dtopofile << "]";
-        dtopofile.close();
 
-        //adjacencyfile << "]";
-        adjacencyfile.close();
+        dtopoqfile.close();
+        adjacencyqfile.close();
 
         if (! pDatabase->add_att_div("VOIES","SOL","STRUCT","LENGTH")) return false;
 
@@ -2321,6 +2381,9 @@ bool Voies::do_Att_Voie(bool connexion, bool use, bool inclusion){
 
     //construction de la table VOIES en BDD
     if (! insertINFO()) return false;
+
+    //upadte SIF
+    if (! updateSIF()) return false;
 
     return true;
 

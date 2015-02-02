@@ -70,6 +70,9 @@ private:
     //---complétion de la table INFO
     bool insertINFO();
 
+    //---complétion de la table SIF
+    bool updateSIF();
+
     //nombre de couples
     int m_nbCouples;
     //nombre de célibataires
