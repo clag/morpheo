@@ -60,6 +60,7 @@ private:
 
     //---calcul des attributs de voies
     bool calcStructuralite();
+    bool calcStructRel();
     bool calcInclusion();
     bool calcGradient();
     bool calcConnexion();
@@ -95,6 +96,9 @@ private:
 
     //nombre de voies
     int m_nbVoies;
+
+    //nb de voies supprimées
+    int m_nbVoies_supp;
 
     //graphe auquel les voies sont rattachées
     Graphe* m_Graphe;

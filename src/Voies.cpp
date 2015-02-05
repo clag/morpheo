@@ -1108,6 +1108,8 @@ bool Voies::calcStructuralite(){
         }
         QTextStream adjacencystream( &adjacencyqfile );
 
+        int nb_voies_supprimees = 0;
+
         for(int idv1 = 1; idv1 < m_nbVoies + 1; idv1 ++) {
 
             pLogger->DEBUG(QString("*** VOIE V : %1").arg(idv1));
@@ -1148,7 +1150,7 @@ bool Voies::calcStructuralite(){
                 V_ordreNombre.push_back(0);
                 V_ordreLength.push_back(0);
 
-                //------------------------------------------voie j
+                //------------------------------------------voie idv2
                 for(int idv2 = 1; idv2 < m_nbVoies + 1; idv2++){
                     //on cherche toutes les voies de l'ordre auquel on se trouve
                     if(dtopo_voies[idv2] == dtopo){
@@ -1169,7 +1171,7 @@ bool Voies::calcStructuralite(){
 
                     }//end if (on trouve les voies de l'ordre souhaite)
 
-                }//end for j (voie)
+                }//end for idv2 (voie)
 
                 //si aucune voie n'a ete trouvee comme connectee a celle qui nous interesse
                 if(nb_voiestraitees == nb_voiestraitees_test){
@@ -1193,6 +1195,8 @@ bool Voies::calcStructuralite(){
                         QSqlQuery deleteVOIES;
                         deleteVOIES.prepare("DELETE FROM VOIES WHERE idv = :IDV ;");
                         deleteVOIES.bindValue(":IDV",idv1 );
+
+                        nb_voies_supprimees +=1;
 
                         if (! deleteVOIES.exec()) {
                             pLogger->ERREUR(QString("Impossible de supprimer la voie %1").arg(idv1));
@@ -1280,6 +1284,8 @@ bool Voies::calcStructuralite(){
 
         }//end for idv1
 
+        m_nbVoies_supp = nb_voies_supprimees;
+
 
         dtopoqfile.close();
         adjacencyqfile.close();
@@ -1301,6 +1307,129 @@ bool Voies::calcStructuralite(){
     return true;
 
 }//END calcStructuralite
+
+bool Voies::calcStructRel(){
+
+    if (! pDatabase->columnExists("VOIES", "STRUCT_REL")) {
+        pLogger->INFO("---------------------- calcStructRel START ----------------------");
+
+        // AJOUT DE L'ATTRIBUT DE STRUCTURALITE RELATIVE
+        QSqlQueryModel addStructRelInVOIES;
+        addStructRelInVOIES.setQuery("ALTER TABLE VOIES ADD STRUCT_REL float;");
+
+        if (addStructRelInVOIES.lastError().isValid()) {
+            pLogger->ERREUR(QString("Impossible d'ajouter les attributs de structuralité relative dans VOIES : %1").arg(addStructRelInVOIES.lastError().text()));
+            return false;
+        }
+
+        QSqlQueryModel *structFromVOIES = new QSqlQueryModel();
+
+        structFromVOIES->setQuery("SELECT IDV, STRUCT AS STRUCT_VOIE, CL_SOL AS MAILL_VOIE FROM VOIES;");
+
+        if (structFromVOIES->lastError().isValid()) {
+            pLogger->ERREUR(QString("Impossible de recuperer les structuralites dans VOIES pour calculer l'inclusion: %1").arg(structFromVOIES->lastError().text()));
+            return false;
+        }//end if : test requete QSqlQueryModel
+
+        //CREATION DES TABLEAUX DONNANT LA STRUCTURALITE ET LA CLASSE DE MAILLANCE DE CHAQUE VOIE
+        float struct_voie[m_nbVoies + 1];
+        float sol_voie[m_nbVoies + 1];
+
+        for(int i = 0; i < m_nbVoies + 1; i++){
+            struct_voie[i] = 0;
+            sol_voie[i] = 0;
+        }
+
+        for(int v = 0; v < m_nbVoies; v++){
+            int idv = structFromVOIES->record(v).value("IDV").toInt();
+            struct_voie[idv]=structFromVOIES->record(v).value("STRUCT_VOIE").toFloat();
+            sol_voie[idv]=structFromVOIES->record(v).value("MAILL_VOIE").toFloat();
+            m_struct_tot += struct_voie[idv];
+        }//end for v
+
+
+        //SUPPRESSION DE L'OBJET
+        delete structFromVOIES;
+
+        int nb_voiestraitees = 0;
+
+        //tableau des distances topologiques
+        int dtopo_voies[m_nbVoies + 1];
+
+        for(int i = 0; i < m_nbVoies + 1; i++){
+            if(sol_voie[i]==0){
+                dtopo_voies[i]=0;
+                nb_voiestraitees++;
+            }
+            else{
+                dtopo_voies[i]=-1;
+            }
+        }//end for i
+
+        int dtopo = 0;
+
+
+
+        cout<<"m_nbVoies : "<<m_nbVoies<<endl;
+        cout<<"m_nbVoies_supp : "<<m_nbVoies_supp<<endl;
+
+        //on parcourt l'ensemble des voies
+        while(nb_voiestraitees != m_nbVoies-m_nbVoies_supp && dtopo != m_nbVoies) {
+
+            for(int idv_ref = 1; idv_ref < m_nbVoies + 1; idv_ref++){
+
+                //on cherche toutes les voies de l'ordre auquel on se trouve
+                if (dtopo_voies[idv_ref] == dtopo){
+
+                    //on cherche toutes les voies qui la croise
+                    for (int v = 0; v < m_VoieVoies.at(idv_ref).size(); v++) {
+                        long idv_t = m_VoieVoies.at(idv_ref).at(v);
+
+                        // = si la voie n'a pas deja ete traitee
+                        if (dtopo_voies[idv_t] == -1){
+
+                            //on actualise sa distance topologique par rapport à la structure
+                            dtopo_voies[idv_t] = dtopo +1;
+                            nb_voiestraitees++;
+
+                        }//end if (voie non traitee)
+                    }//end for v (toutes les voies qui croisent notre voie de référence)
+
+                }//end if (on trouve les voies de l'ordre souhaite)
+
+
+             }//end for idv_ref (voie)
+
+            dtopo++;
+            cout<<"dtopo : "<<dtopo<<endl;
+
+        }//end while
+
+
+
+        for(int idv = 1; idv < m_nbVoies + 1; idv++){
+
+            //INSERTION EN BASE
+            QSqlQuery addSRAttInVOIES;
+            addSRAttInVOIES.prepare("UPDATE VOIES SET STRUCT_REL = :STRUCT_REL WHERE idv = :IDV ;");
+            addSRAttInVOIES.bindValue(":IDV",idv );
+            addSRAttInVOIES.bindValue(":STRUCT_REL",dtopo_voies[idv]);
+
+            if (! addSRAttInVOIES.exec()) {
+                pLogger->ERREUR(QString("Impossible d'inserer la structuralité relative %1 pour la voie %2").arg(dtopo_voies[idv]).arg(idv));
+                pLogger->ERREUR(addSRAttInVOIES.lastError().text());
+                return false;
+            }
+
+        }//end for idv
+
+    } else {
+        pLogger->INFO("---------------- StructRel attributes already in VOIES -----------------");
+    }
+
+    return true;
+
+}//END calcStructRel
 
 bool Voies::calcConnexion(){
 
@@ -2090,17 +2219,22 @@ bool Voies::calcGradient(){
             for (int v1 = 0; v1 < m_VoieVoies.at(idv0).size(); v1 ++) {
                 long idv1 = m_VoieVoies.at(idv0).at(v1);
 
+                gradient += fabs(struct_voie[idv0]-struct_voie[idv1]);
+                size_idv3 += 1;
+
                 //on cherche toutes les voies connectées à idv1
                 for (int v2 = 0; v2 < m_VoieVoies.at(idv1).size(); v2 ++) {
                     long idv2 = m_VoieVoies.at(idv1).at(v2);
+
+                    gradient += fabs(struct_voie[idv0]-struct_voie[idv2]);
+                    size_idv3 += 1;
 
                     //on cherche toutes les voies connectées à idv2
                     for (int v3 = 0; v3 < m_VoieVoies.at(idv2).size(); v3 ++) {
                         long idv3 = m_VoieVoies.at(idv2).at(v3);
 
-                        if (struct_voie[idv0]-struct_voie[idv3]>gradient){
-                            gradient = struct_voie[idv0]-struct_voie[idv3];
-                        }
+
+                        gradient += fabs(struct_voie[idv0]-struct_voie[idv3]);
                         size_idv3 += 1;
 
 
@@ -2143,6 +2277,8 @@ bool Voies::calcGradient(){
     return true;
 
 }//END calcGradient
+
+
 
 
 
@@ -2423,6 +2559,15 @@ bool Voies::do_Att_Voie(bool connexion, bool use, bool inclusion, bool gradient)
             pLogger->ERREUR("calcStructuralite en erreur, ROLLBACK (drop column SOL) echoue");
         } else {
             pLogger->INFO("calcStructuralite en erreur, ROLLBACK (drop column SOL) reussi");
+        }
+        return false;
+    }
+
+    if (! calcStructRel()){
+        if (! pDatabase->dropColumn("VOIES", "STRUCT_REL")) {
+            pLogger->ERREUR("calcStructuraliteRel en erreur, ROLLBACK (drop column STRUCT_REL) echoue");
+        } else {
+            pLogger->INFO("calcStructuraliteRel en erreur, ROLLBACK (drop column STRUCT_REL) reussi");
         }
         return false;
     }
