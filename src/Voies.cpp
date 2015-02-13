@@ -1310,12 +1310,12 @@ bool Voies::calcStructuralite(){
 
 bool Voies::calcStructRel(){
 
-    if (! pDatabase->columnExists("VOIES", "STRUCT_REL")) {
+    if (! pDatabase->columnExists("VOIES", "RTOPO_SCL0") ||! pDatabase->columnExists("VOIES", "RTOPO_SCL1") || ! pDatabase->columnExists("VOIES", "RTOPO_MCL0") ||! pDatabase->columnExists("VOIES", "RTOPO_MCL1") || ! pDatabase->columnExists("VOIES", "RTOPO_S1")  || ! pDatabase->columnExists("VOIES", "RTOPO_S2") || ! pDatabase->columnExists("VOIES", "RTOPO_S3")  || ! pDatabase->columnExists("VOIES", "RTOPO_S4") || ! pDatabase->columnExists("VOIES", "RTOPO_S5")  || ! pDatabase->columnExists("VOIES", "RTOPO_S6") || ! pDatabase->columnExists("VOIES", "RTOPO_S7")  || ! pDatabase->columnExists("VOIES", "RTOPO_S8") || ! pDatabase->columnExists("VOIES", "RTOPO_S9")  || ! pDatabase->columnExists("VOIES", "RTOPO_S10")|| ! pDatabase->columnExists("VOIES", "RTOPO_M1")  || ! pDatabase->columnExists("VOIES", "RTOPO_M2") || ! pDatabase->columnExists("VOIES", "RTOPO_M3")  || ! pDatabase->columnExists("VOIES", "RTOPO_M4") || ! pDatabase->columnExists("VOIES", "RTOPO_M5")  || ! pDatabase->columnExists("VOIES", "RTOPO_M6") || ! pDatabase->columnExists("VOIES", "RTOPO_M7")  || ! pDatabase->columnExists("VOIES", "RTOPO_M8") || ! pDatabase->columnExists("VOIES", "RTOPO_M9")  || ! pDatabase->columnExists("VOIES", "RTOPO_M10")) {
         pLogger->INFO("---------------------- calcStructRel START ----------------------");
 
         // AJOUT DE L'ATTRIBUT DE STRUCTURALITE RELATIVE
         QSqlQueryModel addStructRelInVOIES;
-        addStructRelInVOIES.setQuery("ALTER TABLE VOIES ADD STRUCT_REL float;");
+        addStructRelInVOIES.setQuery("ALTER TABLE VOIES ADD RTOPO_SCL0 integer, ADD RTOPO_SCL1 integer, ADD RTOPO_MCL0 integer, ADD RTOPO_MCL1 integer, ADD RTOPO_S1 integer, ADD RTOPO_S2 integer, ADD RTOPO_S3 integer, ADD RTOPO_S4 integer, ADD RTOPO_S5 integer, ADD RTOPO_S6 integer, ADD RTOPO_S7 integer, ADD RTOPO_S8 integer, ADD RTOPO_S9 integer, ADD RTOPO_S10 integer, ADD RTOPO_M1 integer, ADD RTOPO_M2 integer, ADD RTOPO_M3 integer, ADD RTOPO_M4 integer, ADD RTOPO_M5 integer, ADD RTOPO_M6 integer, ADD RTOPO_M7 integer, ADD RTOPO_M8 integer, ADD RTOPO_M9 integer, ADD RTOPO_M10 integer;");
 
         if (addStructRelInVOIES.lastError().isValid()) {
             pLogger->ERREUR(QString("Impossible d'ajouter les attributs de structuralité relative dans VOIES : %1").arg(addStructRelInVOIES.lastError().text()));
@@ -1324,7 +1324,7 @@ bool Voies::calcStructRel(){
 
         QSqlQueryModel *structFromVOIES = new QSqlQueryModel();
 
-        structFromVOIES->setQuery("SELECT IDV, STRUCT AS STRUCT_VOIE, CL_SOL AS MAILL_VOIE FROM VOIES;");
+        structFromVOIES->setQuery("SELECT IDV, STRUCT AS STRUCT_VOIE, SOL AS MAILL_VOIE, CL_S AS CL_S, CL_SOL AS CL_SOL  FROM VOIES;");
 
         if (structFromVOIES->lastError().isValid()) {
             pLogger->ERREUR(QString("Impossible de recuperer les structuralites dans VOIES pour calculer l'inclusion: %1").arg(structFromVOIES->lastError().text()));
@@ -1333,75 +1333,908 @@ bool Voies::calcStructRel(){
 
         //CREATION DES TABLEAUX DONNANT LA STRUCTURALITE ET LA CLASSE DE MAILLANCE DE CHAQUE VOIE
         float struct_voie[m_nbVoies + 1];
+        float cl_struct_voie[m_nbVoies + 1];
+        float struct_voie_sorted10[10];
         float sol_voie[m_nbVoies + 1];
+        float cl_sol_voie[m_nbVoies + 1];
+        float sol_voie_sorted10[10];
 
         for(int i = 0; i < m_nbVoies + 1; i++){
             struct_voie[i] = 0;
             sol_voie[i] = 0;
+            cl_struct_voie[i] = 0;
+            cl_sol_voie[i] = 0;
         }
+
 
         for(int v = 0; v < m_nbVoies; v++){
             int idv = structFromVOIES->record(v).value("IDV").toInt();
             struct_voie[idv]=structFromVOIES->record(v).value("STRUCT_VOIE").toFloat();
             sol_voie[idv]=structFromVOIES->record(v).value("MAILL_VOIE").toFloat();
+            cl_struct_voie[idv]=structFromVOIES->record(v).value("CL_S").toFloat();
+            cl_sol_voie[idv]=structFromVOIES->record(v).value("CL_SOL").toFloat();
             m_struct_tot += struct_voie[idv];
         }//end for v
+
+
+        for(int i = 0; i < 10; i++){
+            struct_voie_sorted10[i] = m_struct_tot;
+        }
+
+        for(int i = 0; i < 10; i++){
+            sol_voie_sorted10[i] = m_struct_tot * m_length_tot;
+        }
+
+
+        cout<<"m_struct_tot : "<<m_struct_tot<<endl;
+
+         //POUR LE TABLEAU DES 10 MEILLEURES STRUCTURALITES
+
+        //affichage du tableau des 10 meilleures structuralités
+        for(int v = 1; v < 10; v++){
+            cout<<"struct_voie_sorted10["<<v<<"] : "<<struct_voie_sorted10[v]<<endl<<endl;
+        }//end for v
+
+        for(int v = 1; v < m_nbVoies + 1; v++){
+            if(struct_voie[v] < struct_voie_sorted10[0] && struct_voie[v]!=0 ){
+                struct_voie_sorted10[9] =  struct_voie_sorted10[8];
+                struct_voie_sorted10[8] =  struct_voie_sorted10[7];
+                struct_voie_sorted10[7] =  struct_voie_sorted10[6];
+                struct_voie_sorted10[6] =  struct_voie_sorted10[5];
+                struct_voie_sorted10[5] =  struct_voie_sorted10[4];
+                struct_voie_sorted10[4] =  struct_voie_sorted10[3];
+                struct_voie_sorted10[3] =  struct_voie_sorted10[2];
+                struct_voie_sorted10[2] =  struct_voie_sorted10[1];
+                struct_voie_sorted10[1] =  struct_voie_sorted10[0];
+                struct_voie_sorted10[0] =  struct_voie[v];
+            }
+            else if(struct_voie[v] < struct_voie_sorted10[1] && struct_voie[v]!=0 ){
+                struct_voie_sorted10[9] =  struct_voie_sorted10[8];
+                struct_voie_sorted10[8] =  struct_voie_sorted10[7];
+                struct_voie_sorted10[7] =  struct_voie_sorted10[6];
+                struct_voie_sorted10[6] =  struct_voie_sorted10[5];
+                struct_voie_sorted10[5] =  struct_voie_sorted10[4];
+                struct_voie_sorted10[4] =  struct_voie_sorted10[3];
+                struct_voie_sorted10[3] =  struct_voie_sorted10[2];
+                struct_voie_sorted10[2] =  struct_voie_sorted10[1];
+                struct_voie_sorted10[1] =  struct_voie[v];
+            }
+            else if(struct_voie[v] < struct_voie_sorted10[2] && struct_voie[v]!=0 ){
+                struct_voie_sorted10[9] =  struct_voie_sorted10[8];
+                struct_voie_sorted10[8] =  struct_voie_sorted10[7];
+                struct_voie_sorted10[7] =  struct_voie_sorted10[6];
+                struct_voie_sorted10[6] =  struct_voie_sorted10[5];
+                struct_voie_sorted10[5] =  struct_voie_sorted10[4];
+                struct_voie_sorted10[4] =  struct_voie_sorted10[3];
+                struct_voie_sorted10[3] =  struct_voie_sorted10[2];
+                struct_voie_sorted10[2] =  struct_voie[v];
+            }
+            else if(struct_voie[v] < struct_voie_sorted10[3] && struct_voie[v]!=0 ){
+                struct_voie_sorted10[9] =  struct_voie_sorted10[8];
+                struct_voie_sorted10[8] =  struct_voie_sorted10[7];
+                struct_voie_sorted10[7] =  struct_voie_sorted10[6];
+                struct_voie_sorted10[6] =  struct_voie_sorted10[5];
+                struct_voie_sorted10[5] =  struct_voie_sorted10[4];
+                struct_voie_sorted10[4] =  struct_voie_sorted10[3];
+                struct_voie_sorted10[3] =  struct_voie[v];
+            }
+            else if(struct_voie[v] < struct_voie_sorted10[4] && struct_voie[v]!=0 ){
+                struct_voie_sorted10[9] =  struct_voie_sorted10[8];
+                struct_voie_sorted10[8] =  struct_voie_sorted10[7];
+                struct_voie_sorted10[7] =  struct_voie_sorted10[6];
+                struct_voie_sorted10[6] =  struct_voie_sorted10[5];
+                struct_voie_sorted10[5] =  struct_voie_sorted10[4];
+                struct_voie_sorted10[4] =  struct_voie[v];
+            }
+            else if(struct_voie[v] < struct_voie_sorted10[5] && struct_voie[v]!=0 ){
+                struct_voie_sorted10[9] =  struct_voie_sorted10[8];
+                struct_voie_sorted10[8] =  struct_voie_sorted10[7];
+                struct_voie_sorted10[7] =  struct_voie_sorted10[6];
+                struct_voie_sorted10[6] =  struct_voie_sorted10[5];
+                struct_voie_sorted10[5] =  struct_voie[v];
+            }
+            else if(struct_voie[v] < struct_voie_sorted10[6] && struct_voie[v]!=0 ){
+                struct_voie_sorted10[9] =  struct_voie_sorted10[8];
+                struct_voie_sorted10[8] =  struct_voie_sorted10[7];
+                struct_voie_sorted10[7] =  struct_voie_sorted10[6];
+                struct_voie_sorted10[6] =  struct_voie[v];
+            }
+            else if(struct_voie[v] < struct_voie_sorted10[7] && struct_voie[v]!=0 ){
+                struct_voie_sorted10[9] =  struct_voie_sorted10[8];
+                struct_voie_sorted10[8] =  struct_voie_sorted10[7];
+                struct_voie_sorted10[7] =  struct_voie[v];
+            }
+            else if(struct_voie[v] < struct_voie_sorted10[8] && struct_voie[v]!=0 ){
+                struct_voie_sorted10[9] =  struct_voie_sorted10[8];
+                struct_voie_sorted10[8] =  struct_voie[v];
+            }
+            else if(struct_voie[v] < struct_voie_sorted10[9] && struct_voie[v]!=0 ){
+                struct_voie_sorted10[9] =  struct_voie[v];
+            }
+        }//end for v
+
+        //POUR LE TABLEAU DES 10 MEILLEURES MAILLANCES
+
+        for(int v = 1; v < m_nbVoies + 1; v++){
+                 if(sol_voie[v] < sol_voie_sorted10[0] && sol_voie[v]!=0 ){
+                     sol_voie_sorted10[9] =  sol_voie_sorted10[8];
+                     sol_voie_sorted10[8] =  sol_voie_sorted10[7];
+                     sol_voie_sorted10[7] =  sol_voie_sorted10[6];
+                     sol_voie_sorted10[6] =  sol_voie_sorted10[5];
+                     sol_voie_sorted10[5] =  sol_voie_sorted10[4];
+                     sol_voie_sorted10[4] =  sol_voie_sorted10[3];
+                     sol_voie_sorted10[3] =  sol_voie_sorted10[2];
+                     sol_voie_sorted10[2] =  sol_voie_sorted10[1];
+                     sol_voie_sorted10[1] =  sol_voie_sorted10[0];
+                     sol_voie_sorted10[0] =  sol_voie[v];
+                 }
+                 else if(sol_voie[v] < sol_voie_sorted10[1] && sol_voie[v]!=0 ){
+                     sol_voie_sorted10[9] =  sol_voie_sorted10[8];
+                     sol_voie_sorted10[8] =  sol_voie_sorted10[7];
+                     sol_voie_sorted10[7] =  sol_voie_sorted10[6];
+                     sol_voie_sorted10[6] =  sol_voie_sorted10[5];
+                     sol_voie_sorted10[5] =  sol_voie_sorted10[4];
+                     sol_voie_sorted10[4] =  sol_voie_sorted10[3];
+                     sol_voie_sorted10[3] =  sol_voie_sorted10[2];
+                     sol_voie_sorted10[2] =  sol_voie_sorted10[1];
+                     sol_voie_sorted10[1] =  sol_voie[v];
+                 }
+                 else if(sol_voie[v] < sol_voie_sorted10[2] && sol_voie[v]!=0 ){
+                     sol_voie_sorted10[9] =  sol_voie_sorted10[8];
+                     sol_voie_sorted10[8] =  sol_voie_sorted10[7];
+                     sol_voie_sorted10[7] =  sol_voie_sorted10[6];
+                     sol_voie_sorted10[6] =  sol_voie_sorted10[5];
+                     sol_voie_sorted10[5] =  sol_voie_sorted10[4];
+                     sol_voie_sorted10[4] =  sol_voie_sorted10[3];
+                     sol_voie_sorted10[3] =  sol_voie_sorted10[2];
+                     sol_voie_sorted10[2] =  sol_voie[v];
+                 }
+                 else if(sol_voie[v] < sol_voie_sorted10[3] && sol_voie[v]!=0 ){
+                     sol_voie_sorted10[9] =  sol_voie_sorted10[8];
+                     sol_voie_sorted10[8] =  sol_voie_sorted10[7];
+                     sol_voie_sorted10[7] =  sol_voie_sorted10[6];
+                     sol_voie_sorted10[6] =  sol_voie_sorted10[5];
+                     sol_voie_sorted10[5] =  sol_voie_sorted10[4];
+                     sol_voie_sorted10[4] =  sol_voie_sorted10[3];
+                     sol_voie_sorted10[3] =  sol_voie[v];
+                 }
+                 else if(sol_voie[v] < sol_voie_sorted10[4] && sol_voie[v]!=0 ){
+                     sol_voie_sorted10[9] =  sol_voie_sorted10[8];
+                     sol_voie_sorted10[8] =  sol_voie_sorted10[7];
+                     sol_voie_sorted10[7] =  sol_voie_sorted10[6];
+                     sol_voie_sorted10[6] =  sol_voie_sorted10[5];
+                     sol_voie_sorted10[5] =  sol_voie_sorted10[4];
+                     sol_voie_sorted10[4] =  sol_voie[v];
+                 }
+                 else if(sol_voie[v] < sol_voie_sorted10[5] && sol_voie[v]!=0 ){
+                     sol_voie_sorted10[9] =  sol_voie_sorted10[8];
+                     sol_voie_sorted10[8] =  sol_voie_sorted10[7];
+                     sol_voie_sorted10[7] =  sol_voie_sorted10[6];
+                     sol_voie_sorted10[6] =  sol_voie_sorted10[5];
+                     sol_voie_sorted10[5] =  sol_voie[v];
+                 }
+                 else if(sol_voie[v] < sol_voie_sorted10[6] && sol_voie[v]!=0 ){
+                     sol_voie_sorted10[9] =  sol_voie_sorted10[8];
+                     sol_voie_sorted10[8] =  sol_voie_sorted10[7];
+                     sol_voie_sorted10[7] =  sol_voie_sorted10[6];
+                     sol_voie_sorted10[6] =  sol_voie[v];
+                 }
+                 else if(sol_voie[v] < sol_voie_sorted10[7] && sol_voie[v]!=0 ){
+                     sol_voie_sorted10[9] =  sol_voie_sorted10[8];
+                     sol_voie_sorted10[8] =  sol_voie_sorted10[7];
+                     sol_voie_sorted10[7] =  sol_voie[v];
+                 }
+                 else if(sol_voie[v] < sol_voie_sorted10[8] && sol_voie[v]!=0 ){
+                     sol_voie_sorted10[9] =  sol_voie_sorted10[8];
+                     sol_voie_sorted10[8] =  sol_voie[v];
+                 }
+                 else if(sol_voie[v] < sol_voie_sorted10[9] && sol_voie[v]!=0 ){
+                     sol_voie_sorted10[9] =  sol_voie[v];
+                 }
+             }//end for v
 
 
         //SUPPRESSION DE L'OBJET
         delete structFromVOIES;
 
-        int nb_voiestraitees = 0;
+        //affichage du tableau des 10 meilleures structuralités
+        for(int v = 1; v < 10; v++){
+            cout<<"struct_voie_sorted10["<<v<<"] : "<<struct_voie_sorted10[v]<<endl;
+        }//end for v
 
         //tableau des distances topologiques
-        int dtopo_voies[m_nbVoies + 1];
+        int dtopo_voies_scl0[m_nbVoies + 1];
+        int dtopo_voies_scl1[m_nbVoies + 1];
+        int dtopo_voies_mcl0[m_nbVoies + 1];
+        int dtopo_voies_mcl1[m_nbVoies + 1];
+
+        int dtopo_voies_m1[m_nbVoies + 1];
+        int dtopo_voies_m2[m_nbVoies + 1];
+        int dtopo_voies_m3[m_nbVoies + 1];
+        int dtopo_voies_m4[m_nbVoies + 1];
+        int dtopo_voies_m5[m_nbVoies + 1];
+        int dtopo_voies_m6[m_nbVoies + 1];
+        int dtopo_voies_m7[m_nbVoies + 1];
+        int dtopo_voies_m8[m_nbVoies + 1];
+        int dtopo_voies_m9[m_nbVoies + 1];
+        int dtopo_voies_m10[m_nbVoies + 1];
+
+        int dtopo_voies_s1[m_nbVoies + 1];
+        int dtopo_voies_s2[m_nbVoies + 1];
+        int dtopo_voies_s3[m_nbVoies + 1];
+        int dtopo_voies_s4[m_nbVoies + 1];
+        int dtopo_voies_s5[m_nbVoies + 1];
+        int dtopo_voies_s6[m_nbVoies + 1];
+        int dtopo_voies_s7[m_nbVoies + 1];
+        int dtopo_voies_s8[m_nbVoies + 1];
+        int dtopo_voies_s9[m_nbVoies + 1];
+        int dtopo_voies_s10[m_nbVoies + 1];
+
+        int nb_voiestraitees_s1 = 0;
+        int nb_voiestraitees_s2 = 0;
+        int nb_voiestraitees_s3 = 0;
+        int nb_voiestraitees_s4 = 0;
+        int nb_voiestraitees_s5 = 0;
+        int nb_voiestraitees_s6 = 0;
+        int nb_voiestraitees_s7 = 0;
+        int nb_voiestraitees_s8 = 0;
+        int nb_voiestraitees_s9 = 0;
+        int nb_voiestraitees_s10 = 0;
 
         for(int i = 0; i < m_nbVoies + 1; i++){
-            if(sol_voie[i]==0){
-                dtopo_voies[i]=0;
-                nb_voiestraitees++;
+
+            //CLASSES MAILLANCE
+            //Meshing CL0
+            if(cl_sol_voie[i]<1){
+                dtopo_voies_mcl0[i]=0;
             }
             else{
-                dtopo_voies[i]=-1;
+                dtopo_voies_mcl0[i]=-1;
             }
+            //Meshing CL1
+            if(cl_sol_voie[i]<2){
+                dtopo_voies_mcl1[i]=0;
+            }
+            else{
+                dtopo_voies_mcl1[i]=-1;
+            }
+
+            //CLASSES STRUCTURALITE
+            //Structurality CL0
+            if(cl_struct_voie[i]<1){
+                dtopo_voies_scl0[i]=0;
+            }
+            else{
+                dtopo_voies_scl0[i]=-1;
+            }
+            //Structurality CL1
+            if(cl_struct_voie[i]<2){
+                dtopo_voies_scl1[i]=0;
+            }
+            else{
+                dtopo_voies_scl1[i]=-1;
+            }
+
+
+            //Structurality MAX1
+            if(struct_voie[i]<=struct_voie_sorted10[0]){
+                dtopo_voies_s1[i]=0;
+                nb_voiestraitees_s1++;
+            }
+            else{
+                dtopo_voies_s1[i]=-1;
+            }
+            //Structurality MAX2
+            if(struct_voie[i]<=struct_voie_sorted10[1]){
+                dtopo_voies_s2[i]=0;
+                nb_voiestraitees_s2++;
+            }
+            else{
+                dtopo_voies_s2[i]=-1;
+            }
+            //Structurality MAX3
+            if(struct_voie[i]<=struct_voie_sorted10[2]){
+                dtopo_voies_s3[i]=0;
+                nb_voiestraitees_s3++;
+            }
+            else{
+                dtopo_voies_s3[i]=-1;
+            }
+            //Structurality MAX4
+            if(struct_voie[i]<=struct_voie_sorted10[3]){
+                dtopo_voies_s4[i]=0;
+                nb_voiestraitees_s4++;
+            }
+            else{
+                dtopo_voies_s4[i]=-1;
+            }
+            //Structurality MAX5
+            if(struct_voie[i]<=struct_voie_sorted10[4]){
+                dtopo_voies_s5[i]=0;
+                nb_voiestraitees_s5++;
+            }
+            else{
+                dtopo_voies_s5[i]=-1;
+            }
+            //Structurality MAX6
+            if(struct_voie[i]<=struct_voie_sorted10[5]){
+                dtopo_voies_s6[i]=0;
+                nb_voiestraitees_s6++;
+            }
+            else{
+                dtopo_voies_s6[i]=-1;
+            }
+            //Structurality MAX7
+            if(struct_voie[i]<=struct_voie_sorted10[6]){
+                dtopo_voies_s7[i]=0;
+                nb_voiestraitees_s7++;
+            }
+            else{
+                dtopo_voies_s7[i]=-1;
+            }
+            //Structurality MAX8
+            if(struct_voie[i]<=struct_voie_sorted10[7]){
+                dtopo_voies_s8[i]=0;
+                nb_voiestraitees_s8++;
+            }
+            else{
+                dtopo_voies_s8[i]=-1;
+            }
+            //Structurality MAX9
+            if(struct_voie[i]<=struct_voie_sorted10[8]){
+                dtopo_voies_s9[i]=0;
+                nb_voiestraitees_s9++;
+            }
+            else{
+                dtopo_voies_s9[i]=-1;
+            }
+            //Structurality MAX10
+            if(struct_voie[i]<=struct_voie_sorted10[9]){
+                dtopo_voies_s10[i]=0;
+                nb_voiestraitees_s10++;
+            }
+            else{
+                dtopo_voies_s10[i]=-1;
+            }
+
+            //Maillance MAX1
+            if(sol_voie[i]<=sol_voie_sorted10[0]){
+                dtopo_voies_m1[i]=0;
+            }
+            else{
+                dtopo_voies_m1[i]=-1;
+            }
+            //Maillance MAX2
+            if(sol_voie[i]<=sol_voie_sorted10[1]){
+                dtopo_voies_m2[i]=0;
+            }
+            else{
+                dtopo_voies_m2[i]=-1;
+            }
+            //Maillance MAX3
+            if(sol_voie[i]<=sol_voie_sorted10[2]){
+                dtopo_voies_m3[i]=0;
+            }
+            else{
+                dtopo_voies_m3[i]=-1;
+            }
+            //Maillance MAX4
+            if(sol_voie[i]<=sol_voie_sorted10[3]){
+                dtopo_voies_m4[i]=0;
+            }
+            else{
+                dtopo_voies_m4[i]=-1;
+            }
+            //Maillance MAX5
+            if(sol_voie[i]<=sol_voie_sorted10[4]){
+                dtopo_voies_m5[i]=0;
+            }
+            else{
+                dtopo_voies_m5[i]=-1;
+            }
+            //Maillance MAX6
+            if(sol_voie[i]<=sol_voie_sorted10[5]){
+                dtopo_voies_m6[i]=0;
+            }
+            else{
+                dtopo_voies_m6[i]=-1;
+            }
+            //Maillance MAX7
+            if(sol_voie[i]<=sol_voie_sorted10[6]){
+                dtopo_voies_m7[i]=0;
+            }
+            else{
+                dtopo_voies_m7[i]=-1;
+            }
+            //Maillance MAX8
+            if(sol_voie[i]<=sol_voie_sorted10[7]){
+                dtopo_voies_m8[i]=0;
+            }
+            else{
+                dtopo_voies_m8[i]=-1;
+            }
+            //Maillance MAX9
+            if(sol_voie[i]<=sol_voie_sorted10[8]){
+                dtopo_voies_m9[i]=0;
+            }
+            else{
+                dtopo_voies_m9[i]=-1;
+            }
+            //Maillance MAX10
+            if(sol_voie[i]<=sol_voie_sorted10[9]){
+                dtopo_voies_m10[i]=0;
+            }
+            else{
+                dtopo_voies_m10[i]=-1;
+            }
+
+
+
         }//end for i
 
+
         int dtopo = 0;
-
-
 
         cout<<"m_nbVoies : "<<m_nbVoies<<endl;
         cout<<"m_nbVoies_supp : "<<m_nbVoies_supp<<endl;
 
         //on parcourt l'ensemble des voies
-        while(nb_voiestraitees != m_nbVoies-m_nbVoies_supp && dtopo != m_nbVoies) {
+        while(dtopo != m_nbVoies) {
 
             for(int idv_ref = 1; idv_ref < m_nbVoies + 1; idv_ref++){
 
-                //on cherche toutes les voies de l'ordre auquel on se trouve
-                if (dtopo_voies[idv_ref] == dtopo){
+                //on cherche toutes les voies de l'ordre auquel on se trouve POUR MCL0************************************
+                if (dtopo_voies_mcl0[idv_ref] == dtopo){
 
                     //on cherche toutes les voies qui la croise
                     for (int v = 0; v < m_VoieVoies.at(idv_ref).size(); v++) {
                         long idv_t = m_VoieVoies.at(idv_ref).at(v);
 
                         // = si la voie n'a pas deja ete traitee
-                        if (dtopo_voies[idv_t] == -1){
+                        if (dtopo_voies_mcl0[idv_t] == -1){
 
                             //on actualise sa distance topologique par rapport à la structure
-                            dtopo_voies[idv_t] = dtopo +1;
-                            nb_voiestraitees++;
+                            dtopo_voies_mcl0[idv_t] = dtopo +1;
 
                         }//end if (voie non traitee)
                     }//end for v (toutes les voies qui croisent notre voie de référence)
 
-                }//end if (on trouve les voies de l'ordre souhaite)
+                }//end if (on trouve les voies de l'ordre souhaite)******************************************************
+
+
+                //on cherche toutes les voies de l'ordre auquel on se trouve POUR MCL1************************************
+                if (dtopo_voies_mcl1[idv_ref] == dtopo){
+
+                    //on cherche toutes les voies qui la croise
+                    for (int v = 0; v < m_VoieVoies.at(idv_ref).size(); v++) {
+                        long idv_t = m_VoieVoies.at(idv_ref).at(v);
+
+                        // = si la voie n'a pas deja ete traitee
+                        if (dtopo_voies_mcl1[idv_t] == -1){
+
+                            //on actualise sa distance topologique par rapport à la structure
+                            dtopo_voies_mcl1[idv_t] = dtopo +1;
+
+                        }//end if (voie non traitee)
+                    }//end for v (toutes les voies qui croisent notre voie de référence)
+
+                }//end if (on trouve les voies de l'ordre souhaite)******************************************************
+
+                //on cherche toutes les voies de l'ordre auquel on se trouve POUR SCL0************************************
+                if (dtopo_voies_scl0[idv_ref] == dtopo){
+
+                    //on cherche toutes les voies qui la croise
+                    for (int v = 0; v < m_VoieVoies.at(idv_ref).size(); v++) {
+                        long idv_t = m_VoieVoies.at(idv_ref).at(v);
+
+                        // = si la voie n'a pas deja ete traitee
+                        if (dtopo_voies_scl0[idv_t] == -1){
+
+                            //on actualise sa distance topologique par rapport à la structure
+                            dtopo_voies_scl0[idv_t] = dtopo +1;
+
+                        }//end if (voie non traitee)
+                    }//end for v (toutes les voies qui croisent notre voie de référence)
+
+                }//end if (on trouve les voies de l'ordre souhaite)******************************************************
+
+
+                //on cherche toutes les voies de l'ordre auquel on se trouve POUR SCL1************************************
+                if (dtopo_voies_scl1[idv_ref] == dtopo){
+
+                    //on cherche toutes les voies qui la croise
+                    for (int v = 0; v < m_VoieVoies.at(idv_ref).size(); v++) {
+                        long idv_t = m_VoieVoies.at(idv_ref).at(v);
+
+                        // = si la voie n'a pas deja ete traitee
+                        if (dtopo_voies_scl1[idv_t] == -1){
+
+                            //on actualise sa distance topologique par rapport à la structure
+                            dtopo_voies_scl1[idv_t] = dtopo +1;
+
+                        }//end if (voie non traitee)
+                    }//end for v (toutes les voies qui croisent notre voie de référence)
+
+                }//end if (on trouve les voies de l'ordre souhaite)******************************************************
+
+
+                //on cherche toutes les voies de l'ordre auquel on se trouve POUR S1************************************
+                if (dtopo_voies_s1[idv_ref] == dtopo){
+
+                    //on cherche toutes les voies qui la croise
+                    for (int v = 0; v < m_VoieVoies.at(idv_ref).size(); v++) {
+                        long idv_t = m_VoieVoies.at(idv_ref).at(v);
+
+                        // = si la voie n'a pas deja ete traitee
+                        if (dtopo_voies_s1[idv_t] == -1){
+
+                            //on actualise sa distance topologique par rapport à la structure
+                            dtopo_voies_s1[idv_t] = dtopo +1;
+                            nb_voiestraitees_s1++;
+
+                        }//end if (voie non traitee)
+                    }//end for v (toutes les voies qui croisent notre voie de référence)
+
+                }//end if (on trouve les voies de l'ordre souhaite)******************************************************
+
+                //on cherche toutes les voies de l'ordre auquel on se trouve POUR S2************************************
+                if (dtopo_voies_s2[idv_ref] == dtopo){
+
+                    //on cherche toutes les voies qui la croise
+                    for (int v = 0; v < m_VoieVoies.at(idv_ref).size(); v++) {
+                        long idv_t = m_VoieVoies.at(idv_ref).at(v);
+
+                        // = si la voie n'a pas deja ete traitee
+                        if (dtopo_voies_s2[idv_t] == -1){
+
+                            //on actualise sa distance topologique par rapport à la structure
+                            dtopo_voies_s2[idv_t] = dtopo +1;
+                            nb_voiestraitees_s2++;
+
+                        }//end if (voie non traitee)
+                    }//end for v (toutes les voies qui croisent notre voie de référence)
+
+                }//end if (on trouve les voies de l'ordre souhaite)******************************************************
+
+                //on cherche toutes les voies de l'ordre auquel on se trouve POUR S3************************************
+                if (dtopo_voies_s3[idv_ref] == dtopo){
+
+                    //on cherche toutes les voies qui la croise
+                    for (int v = 0; v < m_VoieVoies.at(idv_ref).size(); v++) {
+                        long idv_t = m_VoieVoies.at(idv_ref).at(v);
+
+                        // = si la voie n'a pas deja ete traitee
+                        if (dtopo_voies_s3[idv_t] == -1){
+
+                            //on actualise sa distance topologique par rapport à la structure
+                            dtopo_voies_s3[idv_t] = dtopo +1;
+                            nb_voiestraitees_s3++;
+
+                        }//end if (voie non traitee)
+                    }//end for v (toutes les voies qui croisent notre voie de référence)
+
+                }//end if (on trouve les voies de l'ordre souhaite)******************************************************
+
+                //on cherche toutes les voies de l'ordre auquel on se trouve POUR S4************************************
+                if (dtopo_voies_s4[idv_ref] == dtopo){
+
+                    //on cherche toutes les voies qui la croise
+                    for (int v = 0; v < m_VoieVoies.at(idv_ref).size(); v++) {
+                        long idv_t = m_VoieVoies.at(idv_ref).at(v);
+
+                        // = si la voie n'a pas deja ete traitee
+                        if (dtopo_voies_s4[idv_t] == -1){
+
+                            //on actualise sa distance topologique par rapport à la structure
+                            dtopo_voies_s4[idv_t] = dtopo +1;
+                            nb_voiestraitees_s4++;
+
+                        }//end if (voie non traitee)
+                    }//end for v (toutes les voies qui croisent notre voie de référence)
+
+                }//end if (on trouve les voies de l'ordre souhaite)******************************************************
+
+                //on cherche toutes les voies de l'ordre auquel on se trouve POUR S5************************************
+                if (dtopo_voies_s5[idv_ref] == dtopo){
+
+                    //on cherche toutes les voies qui la croise
+                    for (int v = 0; v < m_VoieVoies.at(idv_ref).size(); v++) {
+                        long idv_t = m_VoieVoies.at(idv_ref).at(v);
+
+                        // = si la voie n'a pas deja ete traitee
+                        if (dtopo_voies_s5[idv_t] == -1){
+
+                            //on actualise sa distance topologique par rapport à la structure
+                            dtopo_voies_s5[idv_t] = dtopo +1;
+                            nb_voiestraitees_s5++;
+
+                        }//end if (voie non traitee)
+                    }//end for v (toutes les voies qui croisent notre voie de référence)
+
+                }//end if (on trouve les voies de l'ordre souhaite)******************************************************
+
+                //on cherche toutes les voies de l'ordre auquel on se trouve POUR S6************************************
+                if (dtopo_voies_s6[idv_ref] == dtopo){
+
+                    //on cherche toutes les voies qui la croise
+                    for (int v = 0; v < m_VoieVoies.at(idv_ref).size(); v++) {
+                        long idv_t = m_VoieVoies.at(idv_ref).at(v);
+
+                        // = si la voie n'a pas deja ete traitee
+                        if (dtopo_voies_s6[idv_t] == -1){
+
+                            //on actualise sa distance topologique par rapport à la structure
+                            dtopo_voies_s6[idv_t] = dtopo +1;
+                            nb_voiestraitees_s6++;
+
+                        }//end if (voie non traitee)
+                    }//end for v (toutes les voies qui croisent notre voie de référence)
+
+                }//end if (on trouve les voies de l'ordre souhaite)******************************************************
+
+                //on cherche toutes les voies de l'ordre auquel on se trouve POUR S7************************************
+                if (dtopo_voies_s7[idv_ref] == dtopo){
+
+                    //on cherche toutes les voies qui la croise
+                    for (int v = 0; v < m_VoieVoies.at(idv_ref).size(); v++) {
+                        long idv_t = m_VoieVoies.at(idv_ref).at(v);
+
+                        // = si la voie n'a pas deja ete traitee
+                        if (dtopo_voies_s7[idv_t] == -1){
+
+                            //on actualise sa distance topologique par rapport à la structure
+                            dtopo_voies_s7[idv_t] = dtopo +1;
+                            nb_voiestraitees_s7++;
+
+                        }//end if (voie non traitee)
+                    }//end for v (toutes les voies qui croisent notre voie de référence)
+
+                }//end if (on trouve les voies de l'ordre souhaite)******************************************************
+
+                //on cherche toutes les voies de l'ordre auquel on se trouve POUR S8************************************
+                if (dtopo_voies_s8[idv_ref] == dtopo){
+
+                    //on cherche toutes les voies qui la croise
+                    for (int v = 0; v < m_VoieVoies.at(idv_ref).size(); v++) {
+                        long idv_t = m_VoieVoies.at(idv_ref).at(v);
+
+                        // = si la voie n'a pas deja ete traitee
+                        if (dtopo_voies_s8[idv_t] == -1){
+
+                            //on actualise sa distance topologique par rapport à la structure
+                            dtopo_voies_s8[idv_t] = dtopo +1;
+                            nb_voiestraitees_s8++;
+
+                        }//end if (voie non traitee)
+                    }//end for v (toutes les voies qui croisent notre voie de référence)
+
+                }//end if (on trouve les voies de l'ordre souhaite)******************************************************
+
+                //on cherche toutes les voies de l'ordre auquel on se trouve POUR S9************************************
+                if (dtopo_voies_s9[idv_ref] == dtopo){
+
+                    //on cherche toutes les voies qui la croise
+                    for (int v = 0; v < m_VoieVoies.at(idv_ref).size(); v++) {
+                        long idv_t = m_VoieVoies.at(idv_ref).at(v);
+
+                        // = si la voie n'a pas deja ete traitee
+                        if (dtopo_voies_s9[idv_t] == -1){
+
+                            //on actualise sa distance topologique par rapport à la structure
+                            dtopo_voies_s9[idv_t] = dtopo +1;
+                            nb_voiestraitees_s9++;
+
+                        }//end if (voie non traitee)
+                    }//end for v (toutes les voies qui croisent notre voie de référence)
+
+                }//end if (on trouve les voies de l'ordre souhaite)******************************************************
+
+                //on cherche toutes les voies de l'ordre auquel on se trouve POUR S10************************************
+                if (dtopo_voies_s10[idv_ref] == dtopo){
+
+                    //on cherche toutes les voies qui la croise
+                    for (int v = 0; v < m_VoieVoies.at(idv_ref).size(); v++) {
+                        long idv_t = m_VoieVoies.at(idv_ref).at(v);
+
+                        // = si la voie n'a pas deja ete traitee
+                        if (dtopo_voies_s10[idv_t] == -1){
+
+                            //on actualise sa distance topologique par rapport à la structure
+                            dtopo_voies_s10[idv_t] = dtopo +1;
+                            nb_voiestraitees_s10++;
+
+                        }//end if (voie non traitee)
+                    }//end for v (toutes les voies qui croisent notre voie de référence)
+
+                }//end if (on trouve les voies de l'ordre souhaite)******************************************************
+
+
+                //on cherche toutes les voies de l'ordre auquel on se trouve POUR M1************************************
+                if (dtopo_voies_m1[idv_ref] == dtopo){
+
+                    //on cherche toutes les voies qui la croise
+                    for (int v = 0; v < m_VoieVoies.at(idv_ref).size(); v++) {
+                        long idv_t = m_VoieVoies.at(idv_ref).at(v);
+
+                        // = si la voie n'a pas deja ete traitee
+                        if (dtopo_voies_m1[idv_t] == -1){
+
+                            //on actualise sa distance topologique par rapport à la structure
+                            dtopo_voies_m1[idv_t] = dtopo +1;
+
+                        }//end if (voie non traitee)
+                    }//end for v (toutes les voies qui croisent notre voie de référence)
+
+                }//end if (on trouve les voies de l'ordre souhaite)******************************************************
+
+                //on cherche toutes les voies de l'ordre auquel on se trouve POUR M2************************************
+                if (dtopo_voies_m2[idv_ref] == dtopo){
+
+                    //on cherche toutes les voies qui la croise
+                    for (int v = 0; v < m_VoieVoies.at(idv_ref).size(); v++) {
+                        long idv_t = m_VoieVoies.at(idv_ref).at(v);
+
+                        // = si la voie n'a pas deja ete traitee
+                        if (dtopo_voies_m2[idv_t] == -1){
+
+                            //on actualise sa distance topologique par rapport à la structure
+                            dtopo_voies_m2[idv_t] = dtopo +1;
+
+                        }//end if (voie non traitee)
+                    }//end for v (toutes les voies qui croisent notre voie de référence)
+
+                }//end if (on trouve les voies de l'ordre souhaite)******************************************************
+
+                //on cherche toutes les voies de l'ordre auquel on se trouve POUR M3************************************
+                if (dtopo_voies_m3[idv_ref] == dtopo){
+
+                    //on cherche toutes les voies qui la croise
+                    for (int v = 0; v < m_VoieVoies.at(idv_ref).size(); v++) {
+                        long idv_t = m_VoieVoies.at(idv_ref).at(v);
+
+                        // = si la voie n'a pas deja ete traitee
+                        if (dtopo_voies_m3[idv_t] == -1){
+
+                            //on actualise sa distance topologique par rapport à la structure
+                            dtopo_voies_m3[idv_t] = dtopo +1;
+
+                        }//end if (voie non traitee)
+                    }//end for v (toutes les voies qui croisent notre voie de référence)
+
+                }//end if (on trouve les voies de l'ordre souhaite)******************************************************
+
+                //on cherche toutes les voies de l'ordre auquel on se trouve POUR M4************************************
+                if (dtopo_voies_m4[idv_ref] == dtopo){
+
+                    //on cherche toutes les voies qui la croise
+                    for (int v = 0; v < m_VoieVoies.at(idv_ref).size(); v++) {
+                        long idv_t = m_VoieVoies.at(idv_ref).at(v);
+
+                        // = si la voie n'a pas deja ete traitee
+                        if (dtopo_voies_m4[idv_t] == -1){
+
+                            //on actualise sa distance topologique par rapport à la structure
+                            dtopo_voies_m4[idv_t] = dtopo +1;
+
+                        }//end if (voie non traitee)
+                    }//end for v (toutes les voies qui croisent notre voie de référence)
+
+                }//end if (on trouve les voies de l'ordre souhaite)******************************************************
+
+                //on cherche toutes les voies de l'ordre auquel on se trouve POUR M5************************************
+                if (dtopo_voies_m5[idv_ref] == dtopo){
+
+                    //on cherche toutes les voies qui la croise
+                    for (int v = 0; v < m_VoieVoies.at(idv_ref).size(); v++) {
+                        long idv_t = m_VoieVoies.at(idv_ref).at(v);
+
+                        // = si la voie n'a pas deja ete traitee
+                        if (dtopo_voies_m5[idv_t] == -1){
+
+                            //on actualise sa distance topologique par rapport à la structure
+                            dtopo_voies_m5[idv_t] = dtopo +1;
+
+                        }//end if (voie non traitee)
+                    }//end for v (toutes les voies qui croisent notre voie de référence)
+
+                }//end if (on trouve les voies de l'ordre souhaite)******************************************************
+
+                //on cherche toutes les voies de l'ordre auquel on se trouve POUR M6************************************
+                if (dtopo_voies_m6[idv_ref] == dtopo){
+
+                    //on cherche toutes les voies qui la croise
+                    for (int v = 0; v < m_VoieVoies.at(idv_ref).size(); v++) {
+                        long idv_t = m_VoieVoies.at(idv_ref).at(v);
+
+                        // = si la voie n'a pas deja ete traitee
+                        if (dtopo_voies_m6[idv_t] == -1){
+
+                            //on actualise sa distance topologique par rapport à la structure
+                            dtopo_voies_m6[idv_t] = dtopo +1;
+
+                        }//end if (voie non traitee)
+                    }//end for v (toutes les voies qui croisent notre voie de référence)
+
+                }//end if (on trouve les voies de l'ordre souhaite)******************************************************
+
+                //on cherche toutes les voies de l'ordre auquel on se trouve POUR M7************************************
+                if (dtopo_voies_m7[idv_ref] == dtopo){
+
+                    //on cherche toutes les voies qui la croise
+                    for (int v = 0; v < m_VoieVoies.at(idv_ref).size(); v++) {
+                        long idv_t = m_VoieVoies.at(idv_ref).at(v);
+
+                        // = si la voie n'a pas deja ete traitee
+                        if (dtopo_voies_m7[idv_t] == -1){
+
+                            //on actualise sa distance topologique par rapport à la structure
+                            dtopo_voies_m7[idv_t] = dtopo +1;
+
+                        }//end if (voie non traitee)
+                    }//end for v (toutes les voies qui croisent notre voie de référence)
+
+                }//end if (on trouve les voies de l'ordre souhaite)******************************************************
+
+                //on cherche toutes les voies de l'ordre auquel on se trouve POUR M8************************************
+                if (dtopo_voies_m8[idv_ref] == dtopo){
+
+                    //on cherche toutes les voies qui la croise
+                    for (int v = 0; v < m_VoieVoies.at(idv_ref).size(); v++) {
+                        long idv_t = m_VoieVoies.at(idv_ref).at(v);
+
+                        // = si la voie n'a pas deja ete traitee
+                        if (dtopo_voies_m8[idv_t] == -1){
+
+                            //on actualise sa distance topologique par rapport à la structure
+                            dtopo_voies_m8[idv_t] = dtopo +1;
+
+                        }//end if (voie non traitee)
+                    }//end for v (toutes les voies qui croisent notre voie de référence)
+
+                }//end if (on trouve les voies de l'ordre souhaite)******************************************************
+
+                //on cherche toutes les voies de l'ordre auquel on se trouve POUR M9************************************
+                if (dtopo_voies_m9[idv_ref] == dtopo){
+
+                    //on cherche toutes les voies qui la croise
+                    for (int v = 0; v < m_VoieVoies.at(idv_ref).size(); v++) {
+                        long idv_t = m_VoieVoies.at(idv_ref).at(v);
+
+                        // = si la voie n'a pas deja ete traitee
+                        if (dtopo_voies_m9[idv_t] == -1){
+
+                            //on actualise sa distance topologique par rapport à la structure
+                            dtopo_voies_m9[idv_t] = dtopo +1;
+
+                        }//end if (voie non traitee)
+                    }//end for v (toutes les voies qui croisent notre voie de référence)
+
+                }//end if (on trouve les voies de l'ordre souhaite)******************************************************
+
+                //on cherche toutes les voies de l'ordre auquel on se trouve POUR M10************************************
+                if (dtopo_voies_m10[idv_ref] == dtopo){
+
+                    //on cherche toutes les voies qui la croise
+                    for (int v = 0; v < m_VoieVoies.at(idv_ref).size(); v++) {
+                        long idv_t = m_VoieVoies.at(idv_ref).at(v);
+
+                        // = si la voie n'a pas deja ete traitee
+                        if (dtopo_voies_m10[idv_t] == -1){
+
+                            //on actualise sa distance topologique par rapport à la structure
+                            dtopo_voies_m10[idv_t] = dtopo +1;
+
+                        }//end if (voie non traitee)
+                    }//end for v (toutes les voies qui croisent notre voie de référence)
+
+                }//end if (on trouve les voies de l'ordre souhaite)******************************************************
+
+
 
 
              }//end for idv_ref (voie)
 
             dtopo++;
-            cout<<"dtopo : "<<dtopo<<endl;
 
         }//end while
 
@@ -1411,12 +2244,35 @@ bool Voies::calcStructRel(){
 
             //INSERTION EN BASE
             QSqlQuery addSRAttInVOIES;
-            addSRAttInVOIES.prepare("UPDATE VOIES SET STRUCT_REL = :STRUCT_REL WHERE idv = :IDV ;");
+            addSRAttInVOIES.prepare("UPDATE VOIES SET RTOPO_SCL0 = :RTOPO_SCL0, RTOPO_SCL1 = :RTOPO_SCL1,RTOPO_MCL0 = :RTOPO_MCL0, RTOPO_MCL1 = :RTOPO_MCL1, RTOPO_S1 = :RTOPO_S1, RTOPO_S2 = :RTOPO_S2, RTOPO_S3 = :RTOPO_S3, RTOPO_S4 = :RTOPO_S4, RTOPO_S5 = :RTOPO_S5, RTOPO_S6 = :RTOPO_S6, RTOPO_S7 = :RTOPO_S7, RTOPO_S8 = :RTOPO_S8, RTOPO_S9 = :RTOPO_S9, RTOPO_S10 = :RTOPO_S10, RTOPO_M1 = :RTOPO_M1, RTOPO_M2 = :RTOPO_M2, RTOPO_M3 = :RTOPO_M3, RTOPO_M4 = :RTOPO_M4, RTOPO_M5 = :RTOPO_M5, RTOPO_M6 = :RTOPO_M6, RTOPO_M7 = :RTOPO_M7, RTOPO_M8 = :RTOPO_M8, RTOPO_M9 = :RTOPO_M9, RTOPO_M10 = :RTOPO_M10 WHERE idv = :IDV ;");
             addSRAttInVOIES.bindValue(":IDV",idv );
-            addSRAttInVOIES.bindValue(":STRUCT_REL",dtopo_voies[idv]);
+            addSRAttInVOIES.bindValue(":RTOPO_SCL0",dtopo_voies_scl0[idv]);
+            addSRAttInVOIES.bindValue(":RTOPO_SCL1",dtopo_voies_scl1[idv]);
+            addSRAttInVOIES.bindValue(":RTOPO_MCL0",dtopo_voies_mcl0[idv]);
+            addSRAttInVOIES.bindValue(":RTOPO_MCL1",dtopo_voies_mcl1[idv]);
+            addSRAttInVOIES.bindValue(":RTOPO_S1",dtopo_voies_s1[idv]);
+            addSRAttInVOIES.bindValue(":RTOPO_S2",dtopo_voies_s2[idv]);
+            addSRAttInVOIES.bindValue(":RTOPO_S3",dtopo_voies_s3[idv]);
+            addSRAttInVOIES.bindValue(":RTOPO_S4",dtopo_voies_s4[idv]);
+            addSRAttInVOIES.bindValue(":RTOPO_S5",dtopo_voies_s5[idv]);
+            addSRAttInVOIES.bindValue(":RTOPO_S6",dtopo_voies_s6[idv]);
+            addSRAttInVOIES.bindValue(":RTOPO_S7",dtopo_voies_s7[idv]);
+            addSRAttInVOIES.bindValue(":RTOPO_S8",dtopo_voies_s8[idv]);
+            addSRAttInVOIES.bindValue(":RTOPO_S9",dtopo_voies_s9[idv]);
+            addSRAttInVOIES.bindValue(":RTOPO_S10",dtopo_voies_s10[idv]);
+            addSRAttInVOIES.bindValue(":RTOPO_M1",dtopo_voies_m1[idv]);
+            addSRAttInVOIES.bindValue(":RTOPO_M2",dtopo_voies_m2[idv]);
+            addSRAttInVOIES.bindValue(":RTOPO_M3",dtopo_voies_m3[idv]);
+            addSRAttInVOIES.bindValue(":RTOPO_M4",dtopo_voies_m4[idv]);
+            addSRAttInVOIES.bindValue(":RTOPO_M5",dtopo_voies_m5[idv]);
+            addSRAttInVOIES.bindValue(":RTOPO_M6",dtopo_voies_m6[idv]);
+            addSRAttInVOIES.bindValue(":RTOPO_M7",dtopo_voies_m7[idv]);
+            addSRAttInVOIES.bindValue(":RTOPO_M8",dtopo_voies_m8[idv]);
+            addSRAttInVOIES.bindValue(":RTOPO_M9",dtopo_voies_m9[idv]);
+            addSRAttInVOIES.bindValue(":RTOPO_M10",dtopo_voies_m10[idv]);
 
             if (! addSRAttInVOIES.exec()) {
-                pLogger->ERREUR(QString("Impossible d'inserer la structuralité relative %1 pour la voie %2").arg(dtopo_voies[idv]).arg(idv));
+                pLogger->ERREUR(QString("Impossible d'inserer les structuralité relatives pour la voie %1").arg(idv));
                 pLogger->ERREUR(addSRAttInVOIES.lastError().text());
                 return false;
             }
@@ -2564,10 +3420,125 @@ bool Voies::do_Att_Voie(bool connexion, bool use, bool inclusion, bool gradient)
     }
 
     if (! calcStructRel()){
-        if (! pDatabase->dropColumn("VOIES", "STRUCT_REL")) {
-            pLogger->ERREUR("calcStructuraliteRel en erreur, ROLLBACK (drop column STRUCT_REL) echoue");
+        if (! pDatabase->dropColumn("VOIES", "RTOPO_SCL0")) {
+            pLogger->ERREUR("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_SCL0) echoue");
         } else {
-            pLogger->INFO("calcStructuraliteRel en erreur, ROLLBACK (drop column STRUCT_REL) reussi");
+            pLogger->INFO("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_SCL0) reussi");
+        }
+        if (! pDatabase->dropColumn("VOIES", "RTOPO_SCL1")) {
+            pLogger->ERREUR("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_SCL1) echoue");
+        } else {
+            pLogger->INFO("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_SCL1) reussi");
+        }
+        if (! pDatabase->dropColumn("VOIES", "RTOPO_MCL0")) {
+            pLogger->ERREUR("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_MCL0) echoue");
+        } else {
+            pLogger->INFO("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_MCL0) reussi");
+        }
+        if (! pDatabase->dropColumn("VOIES", "RTOPO_MCL1")) {
+            pLogger->ERREUR("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_MCL1) echoue");
+        } else {
+            pLogger->INFO("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_MCL1) reussi");
+        }
+        if (! pDatabase->dropColumn("VOIES", "RTOPO_S1")) {
+            pLogger->ERREUR("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_S1) echoue");
+        } else {
+            pLogger->INFO("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_S1) reussi");
+        }
+        if (! pDatabase->dropColumn("VOIES", "RTOPO_S2")) {
+            pLogger->ERREUR("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_S2) echoue");
+        } else {
+            pLogger->INFO("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_S2) reussi");
+        }
+        if (! pDatabase->dropColumn("VOIES", "RTOPO_S3")) {
+            pLogger->ERREUR("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_S3) echoue");
+        } else {
+            pLogger->INFO("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_S3) reussi");
+        }
+        if (! pDatabase->dropColumn("VOIES", "RTOPO_S4")) {
+            pLogger->ERREUR("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_S4) echoue");
+        } else {
+            pLogger->INFO("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_S4) reussi");
+        }
+        if (! pDatabase->dropColumn("VOIES", "RTOPO_S5")) {
+            pLogger->ERREUR("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_S5) echoue");
+        } else {
+            pLogger->INFO("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_S5) reussi");
+        }
+        if (! pDatabase->dropColumn("VOIES", "RTOPO_S6")) {
+            pLogger->ERREUR("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_S6) echoue");
+        } else {
+            pLogger->INFO("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_S6) reussi");
+        }
+        if (! pDatabase->dropColumn("VOIES", "RTOPO_S7")) {
+            pLogger->ERREUR("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_S7) echoue");
+        } else {
+            pLogger->INFO("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_S7) reussi");
+        }
+        if (! pDatabase->dropColumn("VOIES", "RTOPO_S8")) {
+            pLogger->ERREUR("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_S8) echoue");
+        } else {
+            pLogger->INFO("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_S8) reussi");
+        }
+        if (! pDatabase->dropColumn("VOIES", "RTOPO_S9")) {
+            pLogger->ERREUR("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_S9) echoue");
+        } else {
+            pLogger->INFO("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_S9) reussi");
+        }
+        if (! pDatabase->dropColumn("VOIES", "RTOPO_S10")) {
+            pLogger->ERREUR("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_S10) echoue");
+        } else {
+            pLogger->INFO("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_S10) reussi");
+        }
+        if (! pDatabase->dropColumn("VOIES", "RTOPO_M1")) {
+            pLogger->ERREUR("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_M1) echoue");
+        } else {
+            pLogger->INFO("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_M1) reussi");
+        }
+        if (! pDatabase->dropColumn("VOIES", "RTOPO_M2")) {
+            pLogger->ERREUR("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_M2) echoue");
+        } else {
+            pLogger->INFO("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_M2) reussi");
+        }
+        if (! pDatabase->dropColumn("VOIES", "RTOPO_M3")) {
+            pLogger->ERREUR("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_M31) echoue");
+        } else {
+            pLogger->INFO("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_M3) reussi");
+        }
+        if (! pDatabase->dropColumn("VOIES", "RTOPO_M4")) {
+            pLogger->ERREUR("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_M4) echoue");
+        } else {
+            pLogger->INFO("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_M4) reussi");
+        }
+        if (! pDatabase->dropColumn("VOIES", "RTOPO_M5")) {
+            pLogger->ERREUR("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_M5) echoue");
+        } else {
+            pLogger->INFO("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_M5) reussi");
+        }
+        if (! pDatabase->dropColumn("VOIES", "RTOPO_M6")) {
+            pLogger->ERREUR("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_M6) echoue");
+        } else {
+            pLogger->INFO("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_M6) reussi");
+        }
+        if (! pDatabase->dropColumn("VOIES", "RTOPO_M7")) {
+            pLogger->ERREUR("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_M7) echoue");
+        } else {
+            pLogger->INFO("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_M7) reussi");
+        }
+        if (! pDatabase->dropColumn("VOIES", "RTOPO_M8")) {
+            pLogger->ERREUR("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_M8) echoue");
+        } else {
+            pLogger->INFO("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_M8) reussi");
+        }
+        if (! pDatabase->dropColumn("VOIES", "RTOPO_M9")) {
+            pLogger->ERREUR("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_M9) echoue");
+        } else {
+            pLogger->INFO("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_M9) reussi");
+        }
+        if (! pDatabase->dropColumn("VOIES", "RTOPO_M10")) {
+            pLogger->ERREUR("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_M10) echoue");
+        } else {
+            pLogger->INFO("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_M10) reussi");
         }
         return false;
     }
