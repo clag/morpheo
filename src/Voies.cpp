@@ -19,7 +19,7 @@ namespace WayMethods {
     };
 }
 
-Voies::Voies(Database* db, Logger* log, Graphe* graphe, WayMethods::methodID methode, double seuil)
+Voies::Voies(Database* db, Logger* log, Graphe* graphe, WayMethods::methodID methode, double seuil, QString rawTableName)
 {
     pDatabase = db;
     pLogger = log;
@@ -27,6 +27,7 @@ Voies::Voies(Database* db, Logger* log, Graphe* graphe, WayMethods::methodID met
     pLogger->INFO(QString("Methode de contruction des voies : %1").arg(WayMethods::MethodeVoies_name[methode]));
 
     m_Graphe = graphe;
+    m_rawTableName = rawTableName;
     m_seuil_angle = seuil;
     m_methode = methode;
     m_nbCouples = 0;
@@ -105,20 +106,24 @@ bool Voies::findCouplesAngleMin(int ids)
 
         int idx = stayingArcs.indexOf(a1);
         if (idx == -1) {
-            pLogger->ERREUR("Pas normal de ne pas avoir l'arc encore disponible");
+            pLogger->ERREUR(QString("Pas normal de ne pas avoir l'arc %1 encore disponible au sommet %2").arg(a1).arg(ids));
             return false;
         }
         stayingArcs.remove(idx);
         idx = stayingArcs.indexOf(a2);
         if (idx == -1) {
-            pLogger->ERREUR("Pas normal de ne pas avoir l'arc encore disponible");
+            pLogger->ERREUR(QString("Pas normal de ne pas avoir l'arc %1 encore disponible au sommet %2").arg(a2).arg(ids));
             return false;
         }
         stayingArcs.remove(idx);
     }
 
     if (stayingArcs.size() > 1) {
-        pLogger->ERREUR("Pas normal d'avoir encore plus d'un arc a cet endroit");
+        pLogger->ERREUR(QString("Pas normal d'avoir encore plus d'un arc a cet endroit (sommet %1)").arg(ids));
+        for (int sa = 0; sa < stayingArcs.size(); sa++) {
+            pLogger->ERREUR(QString("   - Arc %1").arg(stayingArcs.at(sa)));
+        }
+
         return false;
     }
 
@@ -364,11 +369,11 @@ bool Voies::findCouplesArcs(int ids)
 
 
 
-bool Voies::buildCouples(int buffer){
+bool Voies::buildCouples(){
 
     pLogger->INFO("------------------------- buildCouples START -------------------------");
 
-    QString degreefilename=QString("degree_%1.txt").arg(QSqlDatabase::database().databaseName());
+    QString degreefilename=QString("degree_%1_%2.txt").arg(QSqlDatabase::database().databaseName()).arg(m_rawTableName);
     QFile degreeqfile( degreefilename );
     if (! degreeqfile.open(QIODevice::ReadWrite) ) {
         pLogger->ERREUR("Impossible d'ouvrir le fichier où écrire les degrés");
@@ -861,7 +866,7 @@ bool Voies::build_VOIES(){
 
         delete geometryArcs;
 
-        QString geomfilename=QString("geom_%1.txt").arg(QSqlDatabase::database().databaseName());
+        QString geomfilename=QString("geom_%1_%2.txt").arg(QSqlDatabase::database().databaseName()).arg(m_rawTableName);
         QFile geomqfile( geomfilename );
         if (! geomqfile.open(QIODevice::ReadWrite) ) {
             pLogger->ERREUR("Impossible d'ouvrir le fichier où écrire les géométries");
@@ -1058,7 +1063,7 @@ bool Voies::calcStructuralite(){
         }
 
         //open the file
-        QString lengthfilename=QString("length_%1.txt").arg(QSqlDatabase::database().databaseName());
+        QString lengthfilename=QString("length_%1_%2.txt").arg(QSqlDatabase::database().databaseName()).arg(m_rawTableName);
         QFile lengthqfile( lengthfilename );
         if (! lengthqfile.open(QIODevice::ReadWrite) ) {
             pLogger->ERREUR("Impossible d'ouvrir le fichier où écrire les longueurs");
@@ -1091,7 +1096,7 @@ bool Voies::calcStructuralite(){
         //TRAITEMENT DES m_nbVoies VOIES
 
         //open the file dtopofile
-        QString dtopofilename=QString("dtopo_%1.txt").arg(QSqlDatabase::database().databaseName());
+        QString dtopofilename=QString("dtopo_%1_%2.txt").arg(QSqlDatabase::database().databaseName()).arg(m_rawTableName);
         QFile dtopoqfile( dtopofilename );
         if (! dtopoqfile.open(QIODevice::ReadWrite) ) {
             pLogger->ERREUR("Impossible d'ouvrir le fichier où écrire les distance topographiques");
@@ -1100,7 +1105,7 @@ bool Voies::calcStructuralite(){
         QTextStream dtopostream( &dtopoqfile );
 
         //open the file
-        QString adjacencyfilename=QString("adjacency_%1.txt").arg(QSqlDatabase::database().databaseName());
+        QString adjacencyfilename=QString("adjacency_%1_%2.txt").arg(QSqlDatabase::database().databaseName()).arg(m_rawTableName);
         QFile adjacencyqfile( adjacencyfilename );
         if (! adjacencyqfile.open(QIODevice::ReadWrite) ) {
             pLogger->ERREUR("Impossible d'ouvrir le fichier où écrire les adjacences");
@@ -3365,10 +3370,10 @@ bool Voies::insertINFO(){
 //
 //***************************************************************************************************************************************************
 
-bool Voies::do_Voies(int buffer){
+bool Voies::do_Voies(){
 
     // Construction des couples d'arcs
-    if (! buildCouples(buffer)) return false;
+    if (! buildCouples()) return false;
 
     // Construction des attributs membres des voies
     if (! buildVectors()) return false;

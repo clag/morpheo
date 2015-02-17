@@ -97,7 +97,7 @@ int Graphe::ajouterSommet(QVariant point){
  */
 int Graphe::find_ids(QVariant point){
 
-    QSqlQuery req_sxyz;
+    QSqlQuery  req_sxyz;
     req_sxyz.prepare("SELECT IDS, DEG FROM SXYZ WHERE ST_Distance(GEOM, :POINT) < :E");
     req_sxyz.bindValue(":POINT", point);
     req_sxyz.bindValue(":E", m_toleranceSommets);
@@ -112,7 +112,11 @@ int Graphe::find_ids(QVariant point){
 
     if(req_sxyz_model.rowCount() > 1){
         // Plusieurs sommets possibles (triés par distance croissante : on informe et on renvoie l'ID du sommet le plus proche
-        pLogger->ATTENTION(QString("req_sxyz : ambiguite - nombre de reponses = %1").arg(req_sxyz_model.rowCount()));
+        pLogger->ATTENTION(QString("req_sxyz : ambiguite - nombre de reponses = %1 pour la tolerance %2").arg(req_sxyz_model.rowCount()).arg(m_toleranceSommets));
+
+        for(int i =0; i<req_sxyz_model.rowCount(); i++){
+            pLogger->INFO(QString("sommet trouve : %1 de degres %2").arg(req_sxyz_model.record(0).value("IDS").toInt()).arg(req_sxyz_model.record(0).value("DEG").toInt() + 1));
+        }
 
         QSqlQuery updateDeg;
         updateDeg.prepare("UPDATE SXYZ SET DEG=:DEG WHERE IDS=:IDS");
@@ -293,7 +297,7 @@ bool Graphe::build_ANGLES(){
         QSqlQuery addAngle;
         addAngle.prepare("INSERT INTO ANGLES(IDS, IDA1, IDA2, ANGLE, USED) VALUES (:IDS, :IDA1, :IDA2, :ANGLE, FALSE);");
 
-        for (int s = 1; s < m_nbSommets; s++) {
+        for (int s = 1; s <= m_nbSommets; s++) {
             queryArcs.bindValue(":IDSI",s);
             queryArcs.bindValue(":IDSF",s);
 

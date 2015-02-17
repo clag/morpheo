@@ -30,10 +30,10 @@ class Voies
 public:
 
     /** \warning Le graphe soit avoir été construit (do_graphe appelé) avant de le fournir dans ce constructeur */
-    Voies(Database* db, Logger* log, Graphe* graphe, WayMethods::methodID methode, double seuil);
+    Voies(Database* db, Logger* log, Graphe* graphe, WayMethods::methodID methode, double seuil, QString rawTableName);
 
     //---construction des voies
-    bool do_Voies(int buffer = 0);
+    bool do_Voies();
 
     //---construction des attributs de voies
     bool do_Att_Voie(bool connexion, bool use, bool inclusion, bool gradient);
@@ -50,7 +50,7 @@ private:
     bool findCouplesArcs(int ids);
 
     //---construction des couples
-    bool buildCouples(int seuil);
+    bool buildCouples();
 
     //---construction des tableaux membres
     bool buildVectors();
@@ -74,6 +74,8 @@ private:
 
     //---complétion de la table SIF
     bool updateSIF();
+
+    QString m_rawTableName;
 
     //nombre de couples
     int m_nbCouples;

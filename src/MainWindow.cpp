@@ -87,7 +87,7 @@ void MainWindow::calculate() {
  //   for(seuil_angle = 148.; seuil_angle<=180; seuil_angle+=2){
 
         //------------------------------- Création du graphe
-        Graphe *graphe_courant = new Graphe(pDatabase, pLogger, 1);
+        Graphe *graphe_courant = new Graphe(pDatabase, pLogger, ui->BufferDoubleSpinBox->value());
 
         ui->statusBar->showMessage("Graph in progress");
         QApplication::processEvents();
@@ -97,7 +97,7 @@ void MainWindow::calculate() {
         }
 
         //------------------------------- Calculs sur les voies
-        Voies *voies_courantes = new Voies(pDatabase, pLogger, graphe_courant, methode, seuil_angle);
+        Voies *voies_courantes = new Voies(pDatabase, pLogger, graphe_courant, methode, seuil_angle, ui->arcstablenameLineEdit->text());
         pLogger->INFO("voies creees");
 
          if (ui->dropVOIESCheckBox->isChecked()){
@@ -107,7 +107,7 @@ void MainWindow::calculate() {
 
         ui->statusBar->showMessage("Ways in progress");
         QApplication::processEvents();
-        if (! voies_courantes->do_Voies(ui->BufferSpinBox->value())) {
+        if (! voies_courantes->do_Voies()) {
             mettreEnErreur("Cannot calculate ways");
             return;
         }

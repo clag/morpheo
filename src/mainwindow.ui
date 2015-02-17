@@ -20,23 +20,23 @@
       <x>0</x>
       <y>0</y>
       <width>861</width>
-      <height>251</height>
+      <height>231</height>
      </rect>
     </property>
     <property name="currentIndex">
      <number>0</number>
     </property>
-    <widget class="QWidget" name="databseTab">
+    <widget class="QWidget" name="databaseTab">
      <attribute name="title">
-      <string>Tab 2</string>
+      <string>Database</string>
      </attribute>
      <widget class="QGroupBox" name="databaseBox">
       <property name="geometry">
        <rect>
         <x>200</x>
         <y>10</y>
-        <width>281</width>
-        <height>151</height>
+        <width>411</width>
+        <height>181</height>
        </rect>
       </property>
       <property name="title">
@@ -47,8 +47,8 @@
         <rect>
          <x>9</x>
          <y>19</y>
-         <width>261</width>
-         <height>121</height>
+         <width>391</width>
+         <height>156</height>
         </rect>
        </property>
        <layout class="QFormLayout" name="databaseFormLayout">
@@ -129,8 +129,32 @@
           </property>
          </widget>
         </item>
-        <item row="4" column="0">
+        <item row="6" column="0">
          <widget class="Line" name="line">
+          <property name="orientation">
+           <enum>Qt::Horizontal</enum>
+          </property>
+         </widget>
+        </item>
+        <item row="5" column="1">
+         <widget class="QLineEdit" name="arcstablenameLineEdit">
+          <property name="inputMask">
+           <string/>
+          </property>
+          <property name="text">
+           <string>brut_arcs</string>
+          </property>
+         </widget>
+        </item>
+        <item row="5" column="0">
+         <widget class="QLabel" name="arcstablenameLabel">
+          <property name="text">
+           <string>Input Table name</string>
+          </property>
+         </widget>
+        </item>
+        <item row="4" column="0" colspan="2">
+         <widget class="Line" name="line_2">
           <property name="orientation">
            <enum>Qt::Horizontal</enum>
           </property>
@@ -139,39 +163,10 @@
        </layout>
       </widget>
      </widget>
-     <widget class="QLabel" name="arcstablenameLabel">
-      <property name="geometry">
-       <rect>
-        <x>530</x>
-        <y>90</y>
-        <width>83</width>
-        <height>20</height>
-       </rect>
-      </property>
-      <property name="text">
-       <string>Input Table name</string>
-      </property>
-     </widget>
-     <widget class="QLineEdit" name="arcstablenameLineEdit">
-      <property name="geometry">
-       <rect>
-        <x>620</x>
-        <y>90</y>
-        <width>207</width>
-        <height>20</height>
-       </rect>
-      </property>
-      <property name="inputMask">
-       <string/>
-      </property>
-      <property name="text">
-       <string>brut_arcs</string>
-      </property>
-     </widget>
     </widget>
     <widget class="QWidget" name="mainTab">
      <attribute name="title">
-      <string>Tab 1</string>
+      <string>Process' parameters</string>
      </attribute>
      <widget class="QPushButton" name="calculatePushButton">
       <property name="geometry">
@@ -224,9 +219,6 @@
         <item row="0" column="1">
          <widget class="QComboBox" name="methodComboBox"/>
         </item>
-        <item row="1" column="1">
-         <widget class="QSpinBox" name="BufferSpinBox"/>
-        </item>
         <item row="2" column="0">
          <widget class="QLabel" name="thresholdLabel">
           <property name="text">
@@ -245,6 +237,13 @@
          <widget class="QLabel" name="bufferLabel">
           <property name="text">
            <string>Buffer</string>
+          </property>
+         </widget>
+        </item>
+        <item row="1" column="1">
+         <widget class="QDoubleSpinBox" name="BufferDoubleSpinBox">
+          <property name="value">
+           <double>1.000000000000000</double>
           </property>
          </widget>
         </item>
@@ -386,7 +385,7 @@
     </widget>
     <widget class="QWidget" name="classificationTab">
      <attribute name="title">
-      <string>Page</string>
+      <string>Tools</string>
      </attribute>
      <widget class="QGroupBox" name="actionGroupBox">
       <property name="geometry">
@@ -602,9 +601,9 @@
     <property name="geometry">
      <rect>
       <x>10</x>
-      <y>250</y>
+      <y>240</y>
       <width>851</width>
-      <height>361</height>
+      <height>371</height>
      </rect>
     </property>
     <property name="title">
