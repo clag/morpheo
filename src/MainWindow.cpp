@@ -3,6 +3,7 @@
 #include "Voies.h"
 #include "Arcs.h"
 #include "ui_mainwindow.h"
+#include <QFileDialog>
 
 MainWindow::MainWindow(Logger* log, QWidget *parent) :
     QMainWindow(parent),
@@ -27,6 +28,8 @@ MainWindow::MainWindow(Logger* log, QWidget *parent) :
 
     connect(ui->calculatePushButton,SIGNAL(clicked()),this,SLOT(calculate()));
     connect(ui->modifyPushButton,SIGNAL(clicked()),this,SLOT(modify()));
+
+    connect(ui->browsePushButton, SIGNAL(clicked()), this, SLOT(browse()));
 
     connect(ui->classificationRadioButton, SIGNAL(toggled(bool)), this, SLOT(optionsModification(bool)));
 
@@ -97,7 +100,7 @@ void MainWindow::calculate() {
         }
 
         //------------------------------- Calculs sur les voies
-        Voies *voies_courantes = new Voies(pDatabase, pLogger, graphe_courant, methode, seuil_angle, ui->arcstablenameLineEdit->text());
+        Voies *voies_courantes = new Voies(pDatabase, pLogger, graphe_courant, methode, seuil_angle, ui->arcstablenameLineEdit->text(), ui->directoryLineEdit->text());
         pLogger->INFO("voies creees");
 
          if (ui->dropVOIESCheckBox->isChecked()){
@@ -237,6 +240,15 @@ void MainWindow::modify() {
     pLogger->INFO(QString("End : %1").arg(end.toString()));
     pLogger->INFO(QString("Temps total d'execution' : %1 minutes").arg(start.secsTo(end) / 60.));
 
+}
+
+void MainWindow::browse()
+{
+    QString directory = QFileDialog::getExistingDirectory(this, tr("Chose a directory..."), QDir::currentPath());
+
+    if (! directory.isEmpty()) {
+        ui->directoryLineEdit->setText(directory);
+    }
 }
 
 

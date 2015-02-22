@@ -26,6 +26,7 @@ public slots:
 
     void calculate();
     void modify();
+    void browse();
 
     void optionsModification(bool checked);
 

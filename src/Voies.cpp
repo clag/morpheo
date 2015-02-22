@@ -19,7 +19,7 @@ namespace WayMethods {
     };
 }
 
-Voies::Voies(Database* db, Logger* log, Graphe* graphe, WayMethods::methodID methode, double seuil, QString rawTableName)
+Voies::Voies(Database* db, Logger* log, Graphe* graphe, WayMethods::methodID methode, double seuil, QString rawTableName, QString directory)
 {
     pDatabase = db;
     pLogger = log;
@@ -28,6 +28,7 @@ Voies::Voies(Database* db, Logger* log, Graphe* graphe, WayMethods::methodID met
 
     m_Graphe = graphe;
     m_rawTableName = rawTableName;
+    m_directory = directory;
     m_seuil_angle = seuil;
     m_methode = methode;
     m_nbCouples = 0;
@@ -373,7 +374,7 @@ bool Voies::buildCouples(){
 
     pLogger->INFO("------------------------- buildCouples START -------------------------");
 
-    QString degreefilename=QString("degree_%1_%2.txt").arg(QSqlDatabase::database().databaseName()).arg(m_rawTableName);
+    QString degreefilename=QString("%1/degree_%2_%3.txt").arg(m_directory).arg(QSqlDatabase::database().databaseName()).arg(m_rawTableName);
     QFile degreeqfile( degreefilename );
     if (! degreeqfile.open(QIODevice::ReadWrite) ) {
         pLogger->ERREUR("Impossible d'ouvrir le fichier où écrire les degrés");
@@ -866,7 +867,7 @@ bool Voies::build_VOIES(){
 
         delete geometryArcs;
 
-        QString geomfilename=QString("geom_%1_%2.txt").arg(QSqlDatabase::database().databaseName()).arg(m_rawTableName);
+        QString geomfilename=QString("%1/geom_%2_%3.txt").arg(m_directory).arg(QSqlDatabase::database().databaseName()).arg(m_rawTableName);
         QFile geomqfile( geomfilename );
         if (! geomqfile.open(QIODevice::ReadWrite) ) {
             pLogger->ERREUR("Impossible d'ouvrir le fichier où écrire les géométries");
@@ -1063,7 +1064,7 @@ bool Voies::calcStructuralite(){
         }
 
         //open the file
-        QString lengthfilename=QString("length_%1_%2.txt").arg(QSqlDatabase::database().databaseName()).arg(m_rawTableName);
+        QString lengthfilename=QString("%1/length_%2_%3.txt").arg(m_directory).arg(QSqlDatabase::database().databaseName()).arg(m_rawTableName);
         QFile lengthqfile( lengthfilename );
         if (! lengthqfile.open(QIODevice::ReadWrite) ) {
             pLogger->ERREUR("Impossible d'ouvrir le fichier où écrire les longueurs");
@@ -1096,7 +1097,7 @@ bool Voies::calcStructuralite(){
         //TRAITEMENT DES m_nbVoies VOIES
 
         //open the file dtopofile
-        QString dtopofilename=QString("dtopo_%1_%2.txt").arg(QSqlDatabase::database().databaseName()).arg(m_rawTableName);
+        QString dtopofilename=QString("%1/dtopo_%2_%3.txt").arg(m_directory).arg(QSqlDatabase::database().databaseName()).arg(m_rawTableName);
         QFile dtopoqfile( dtopofilename );
         if (! dtopoqfile.open(QIODevice::ReadWrite) ) {
             pLogger->ERREUR("Impossible d'ouvrir le fichier où écrire les distance topographiques");
@@ -1104,8 +1105,10 @@ bool Voies::calcStructuralite(){
         }
         QTextStream dtopostream( &dtopoqfile );
 
+        dtopostream << m_nbVoies << endl;
+
         //open the file
-        QString adjacencyfilename=QString("adjacency_%1_%2.txt").arg(QSqlDatabase::database().databaseName()).arg(m_rawTableName);
+        QString adjacencyfilename=QString("%1/adjacency_%2_%3.txt").arg(m_directory).arg(QSqlDatabase::database().databaseName()).arg(m_rawTableName);
         QFile adjacencyqfile( adjacencyfilename );
         if (! adjacencyqfile.open(QIODevice::ReadWrite) ) {
             pLogger->ERREUR("Impossible d'ouvrir le fichier où écrire les adjacences");
@@ -1259,8 +1262,9 @@ bool Voies::calcStructuralite(){
             // adjacencyfile << "[";
 
             for(int i = 1; i < m_nbVoies + 1; i++){
-
-                dtopostream << dtopo_voies[i];
+                if (i <= idv1) {
+                    dtopostream << dtopo_voies[i] << " ";
+                }
 
                 if(dtopo_voies[i] == -1 || dtopo_voies[i] == 0 || dtopo_voies[i] == 1){
                     adjacencystream << dtopo_voies[i];
@@ -1275,7 +1279,6 @@ bool Voies::calcStructuralite(){
                     adjacencyfile << ", ";
                 }
                 else{*/
-                    dtopostream << " ";
                     adjacencystream << " ";
                 //}
 

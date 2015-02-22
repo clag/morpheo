@@ -26,142 +26,200 @@
     <property name="currentIndex">
      <number>0</number>
     </property>
-    <widget class="QWidget" name="databaseTab">
+    <widget class="QWidget" name="dataTab">
      <attribute name="title">
-      <string>Database</string>
+      <string>Data</string>
      </attribute>
-     <widget class="QGroupBox" name="databaseBox">
+     <widget class="QWidget" name="horizontalLayoutWidget">
       <property name="geometry">
        <rect>
-        <x>200</x>
-        <y>10</y>
-        <width>411</width>
-        <height>181</height>
+        <x>0</x>
+        <y>0</y>
+        <width>851</width>
+        <height>201</height>
        </rect>
       </property>
-      <property name="title">
-       <string>Database connection configuration</string>
-      </property>
-      <widget class="QWidget" name="formLayoutWidget">
-       <property name="geometry">
-        <rect>
-         <x>9</x>
-         <y>19</y>
-         <width>391</width>
-         <height>156</height>
-        </rect>
-       </property>
-       <layout class="QFormLayout" name="databaseFormLayout">
-        <property name="fieldGrowthPolicy">
-         <enum>QFormLayout::AllNonFixedFieldsGrow</enum>
-        </property>
-        <property name="labelAlignment">
-         <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-        </property>
-        <item row="0" column="0">
-         <widget class="QLabel" name="dbhostLabel">
-          <property name="text">
-           <string>Host</string>
+      <layout class="QHBoxLayout" name="horizontalLayout">
+       <item>
+        <widget class="QGroupBox" name="databaseBox">
+         <property name="title">
+          <string>Database connection configuration</string>
+         </property>
+         <widget class="QWidget" name="formLayoutWidget">
+          <property name="geometry">
+           <rect>
+            <x>9</x>
+            <y>19</y>
+            <width>401</width>
+            <height>162</height>
+           </rect>
           </property>
+          <layout class="QFormLayout" name="databaseFormLayout">
+           <property name="fieldGrowthPolicy">
+            <enum>QFormLayout::AllNonFixedFieldsGrow</enum>
+           </property>
+           <property name="labelAlignment">
+            <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+           </property>
+           <item row="0" column="0">
+            <widget class="QLabel" name="dbhostLabel">
+             <property name="text">
+              <string>Host</string>
+             </property>
+            </widget>
+           </item>
+           <item row="0" column="1">
+            <widget class="QLineEdit" name="dbhostLineEdit">
+             <property name="inputMask">
+              <string/>
+             </property>
+             <property name="text">
+              <string>localhost</string>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="0">
+            <widget class="QLabel" name="dbnameLabel">
+             <property name="text">
+              <string>Database</string>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="1">
+            <widget class="QLineEdit" name="dbnameLineEdit">
+             <property name="inputMask">
+              <string/>
+             </property>
+             <property name="text">
+              <string>avignon_projets</string>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="0">
+            <widget class="QLabel" name="dbuserLabel">
+             <property name="text">
+              <string>User</string>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="1">
+            <widget class="QLineEdit" name="dbuserLineEdit">
+             <property name="inputMask">
+              <string/>
+             </property>
+             <property name="text">
+              <string>claire</string>
+             </property>
+            </widget>
+           </item>
+           <item row="3" column="0">
+            <widget class="QLabel" name="dbpasswordLabel">
+             <property name="text">
+              <string>Password</string>
+             </property>
+            </widget>
+           </item>
+           <item row="3" column="1">
+            <widget class="QLineEdit" name="dbpassswordLineEdit">
+             <property name="inputMask">
+              <string/>
+             </property>
+             <property name="text">
+              <string>claire</string>
+             </property>
+             <property name="echoMode">
+              <enum>QLineEdit::Password</enum>
+             </property>
+            </widget>
+           </item>
+           <item row="4" column="0" colspan="2">
+            <widget class="Line" name="line_2">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+            </widget>
+           </item>
+           <item row="5" column="0">
+            <widget class="QLabel" name="arcstablenameLabel">
+             <property name="text">
+              <string>Input Table name</string>
+             </property>
+            </widget>
+           </item>
+           <item row="5" column="1">
+            <widget class="QLineEdit" name="arcstablenameLineEdit">
+             <property name="inputMask">
+              <string/>
+             </property>
+             <property name="text">
+              <string>brut_arcs</string>
+             </property>
+            </widget>
+           </item>
+           <item row="6" column="0">
+            <widget class="Line" name="line">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+            </widget>
+           </item>
+          </layout>
          </widget>
-        </item>
-        <item row="0" column="1">
-         <widget class="QLineEdit" name="dbhostLineEdit">
-          <property name="inputMask">
-           <string/>
+         <zorder>formLayoutWidget</zorder>
+         <zorder>horizontalLayoutWidget</zorder>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="directoryBox">
+         <property name="title">
+          <string>Directory to write files</string>
+         </property>
+         <widget class="QWidget" name="verticalLayoutWidget_5">
+          <property name="geometry">
+           <rect>
+            <x>9</x>
+            <y>19</y>
+            <width>401</width>
+            <height>161</height>
+           </rect>
           </property>
-          <property name="text">
-           <string>localhost</string>
-          </property>
+          <layout class="QVBoxLayout" name="verticalLayout_2">
+           <item>
+            <layout class="QHBoxLayout" name="horizontalLayout_2">
+             <item>
+              <widget class="QPushButton" name="browsePushButton">
+               <property name="text">
+                <string>Browse...</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QLineEdit" name="directoryLineEdit">
+               <property name="text">
+                <string>.</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <spacer name="verticalSpacer">
+             <property name="orientation">
+              <enum>Qt::Vertical</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>20</width>
+               <height>40</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+          </layout>
          </widget>
-        </item>
-        <item row="1" column="0">
-         <widget class="QLabel" name="dbnameLabel">
-          <property name="text">
-           <string>Database</string>
-          </property>
-         </widget>
-        </item>
-        <item row="1" column="1">
-         <widget class="QLineEdit" name="dbnameLineEdit">
-          <property name="inputMask">
-           <string/>
-          </property>
-          <property name="text">
-           <string>avignon_projets</string>
-          </property>
-         </widget>
-        </item>
-        <item row="2" column="0">
-         <widget class="QLabel" name="dbuserLabel">
-          <property name="text">
-           <string>User</string>
-          </property>
-         </widget>
-        </item>
-        <item row="2" column="1">
-         <widget class="QLineEdit" name="dbuserLineEdit">
-          <property name="inputMask">
-           <string/>
-          </property>
-          <property name="text">
-           <string>claire</string>
-          </property>
-         </widget>
-        </item>
-        <item row="3" column="0">
-         <widget class="QLabel" name="dbpasswordLabel">
-          <property name="text">
-           <string>Password</string>
-          </property>
-         </widget>
-        </item>
-        <item row="3" column="1">
-         <widget class="QLineEdit" name="dbpassswordLineEdit">
-          <property name="inputMask">
-           <string/>
-          </property>
-          <property name="text">
-           <string>claire</string>
-          </property>
-          <property name="echoMode">
-           <enum>QLineEdit::Password</enum>
-          </property>
-         </widget>
-        </item>
-        <item row="6" column="0">
-         <widget class="Line" name="line">
-          <property name="orientation">
-           <enum>Qt::Horizontal</enum>
-          </property>
-         </widget>
-        </item>
-        <item row="5" column="1">
-         <widget class="QLineEdit" name="arcstablenameLineEdit">
-          <property name="inputMask">
-           <string/>
-          </property>
-          <property name="text">
-           <string>brut_arcs</string>
-          </property>
-         </widget>
-        </item>
-        <item row="5" column="0">
-         <widget class="QLabel" name="arcstablenameLabel">
-          <property name="text">
-           <string>Input Table name</string>
-          </property>
-         </widget>
-        </item>
-        <item row="4" column="0" colspan="2">
-         <widget class="Line" name="line_2">
-          <property name="orientation">
-           <enum>Qt::Horizontal</enum>
-          </property>
-         </widget>
-        </item>
-       </layout>
-      </widget>
+        </widget>
+       </item>
+      </layout>
      </widget>
     </widget>
     <widget class="QWidget" name="mainTab">
@@ -632,7 +690,13 @@
       <string>Debug level</string>
      </property>
     </widget>
+    <zorder>loggerTextBrowser</zorder>
+    <zorder>debugCheckBox</zorder>
+    <zorder>horizontalLayoutWidget</zorder>
    </widget>
+   <zorder>tabWidget</zorder>
+   <zorder>loggerBox</zorder>
+   <zorder>databaseBox</zorder>
   </widget>
   <widget class="QMenuBar" name="menuBar">
    <property name="geometry">

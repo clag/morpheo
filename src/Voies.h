@@ -30,7 +30,7 @@ class Voies
 public:
 
     /** \warning Le graphe soit avoir été construit (do_graphe appelé) avant de le fournir dans ce constructeur */
-    Voies(Database* db, Logger* log, Graphe* graphe, WayMethods::methodID methode, double seuil, QString rawTableName);
+    Voies(Database* db, Logger* log, Graphe* graphe, WayMethods::methodID methode, double seuil, QString rawTableName, QString directory);
 
     //---construction des voies
     bool do_Voies();
@@ -76,6 +76,7 @@ private:
     bool updateSIF();
 
     QString m_rawTableName;
+    QString m_directory;
 
     //nombre de couples
     int m_nbCouples;
