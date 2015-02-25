@@ -89,6 +89,15 @@ void MainWindow::calculate() {
 
  //   for(seuil_angle = 148.; seuil_angle<=180; seuil_angle+=2){
 
+    if (ui->dropTABLESCheckBox->isChecked()){
+        pDatabase->dropTable("SXYZ");
+        pDatabase->dropTable("SIF");
+        pDatabase->dropTable("ANGLES");
+        pDatabase->dropTable("INFO");
+        pDatabase->dropTable("VOIES");
+        pLogger->INFO("table VOIES has been droped");
+    }
+
         //------------------------------- Création du graphe
         Graphe *graphe_courant = new Graphe(pDatabase, pLogger, ui->BufferDoubleSpinBox->value());
 
@@ -103,10 +112,6 @@ void MainWindow::calculate() {
         Voies *voies_courantes = new Voies(pDatabase, pLogger, graphe_courant, methode, seuil_angle, ui->arcstablenameLineEdit->text(), ui->directoryLineEdit->text());
         pLogger->INFO("voies creees");
 
-         if (ui->dropVOIESCheckBox->isChecked()){
-             pDatabase->dropTable("VOIES");
-             pLogger->INFO("table VOIES has been droped");
-         }
 
         ui->statusBar->showMessage("Ways in progress");
         QApplication::processEvents();

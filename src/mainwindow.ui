@@ -18,7 +18,7 @@
     <property name="geometry">
      <rect>
       <x>0</x>
-      <y>0</y>
+      <y>10</y>
       <width>861</width>
       <height>231</height>
      </rect>
@@ -165,8 +165,6 @@
            </item>
           </layout>
          </widget>
-         <zorder>formLayoutWidget</zorder>
-         <zorder>horizontalLayoutWidget</zorder>
         </widget>
        </item>
        <item>
@@ -196,7 +194,7 @@
              <item>
               <widget class="QLineEdit" name="directoryLineEdit">
                <property name="text">
-                <string>.</string>
+                <string>/home/clairel/Codes/+sorties_morpheo</string>
                </property>
               </widget>
              </item>
@@ -311,10 +309,10 @@
      <widget class="QGroupBox" name="dropTablegroupBox">
       <property name="geometry">
        <rect>
-        <x>470</x>
-        <y>20</y>
-        <width>91</width>
-        <height>91</height>
+        <x>20</x>
+        <y>120</y>
+        <width>261</width>
+        <height>51</height>
        </rect>
       </property>
       <property name="title">
@@ -325,15 +323,15 @@
         <rect>
          <x>9</x>
          <y>20</y>
-         <width>71</width>
-         <height>68</height>
+         <width>220</width>
+         <height>22</height>
         </rect>
        </property>
        <layout class="QVBoxLayout" name="dropTableverticalLayout">
         <item>
-         <widget class="QCheckBox" name="dropVOIESCheckBox">
+         <widget class="QCheckBox" name="dropTABLESCheckBox">
           <property name="text">
-           <string>VOIES</string>
+           <string>SXYZ, SIF, ANGLES, INFO, VOIES</string>
           </property>
           <property name="checked">
            <bool>true</bool>
@@ -690,13 +688,7 @@
       <string>Debug level</string>
      </property>
     </widget>
-    <zorder>loggerTextBrowser</zorder>
-    <zorder>debugCheckBox</zorder>
-    <zorder>horizontalLayoutWidget</zorder>
    </widget>
-   <zorder>tabWidget</zorder>
-   <zorder>loggerBox</zorder>
-   <zorder>databaseBox</zorder>
   </widget>
   <widget class="QMenuBar" name="menuBar">
    <property name="geometry">
