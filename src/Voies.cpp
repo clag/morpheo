@@ -1037,12 +1037,12 @@ bool Voies::updateSIF(){
 
 bool Voies::calcStructuralite(){
 
-    if (! pDatabase->columnExists("VOIES", "RTOPO") || ! pDatabase->columnExists("VOIES", "STRUCT")) {
+    if (! pDatabase->columnExists("VOIES", "DEGREE") || ! pDatabase->columnExists("VOIES", "RTOPO") || ! pDatabase->columnExists("VOIES", "STRUCT")) {
         pLogger->INFO("---------------------- calcStructuralite START ----------------------");
 
         // AJOUT DE L'ATTRIBUT DE STRUCTURALITE
         QSqlQueryModel addStructInVOIES;
-        addStructInVOIES.setQuery("ALTER TABLE VOIES ADD RTOPO float, ADD STRUCT float;");
+        addStructInVOIES.setQuery("ALTER TABLE VOIES ADD DEGREE integer, ADD RTOPO float, ADD STRUCT float;");
 
         if (addStructInVOIES.lastError().isValid()) {
             pLogger->ERREUR(QString("Impossible d'ajouter les attributs de structuralite dans VOIES : %1").arg(addStructInVOIES.lastError().text()));
@@ -1127,7 +1127,7 @@ bool Voies::calcStructuralite(){
             //adjacencyfile << idv1 << " ";
 
             //INITIALISATION
-            int structuralite_v = 0;
+            float structuralite_v = 0;
             int rayonTopologique_v = 0;
             int dtopo = 0;
             int nb_voiestraitees = 0;
@@ -1245,8 +1245,9 @@ bool Voies::calcStructuralite(){
 
             //INSERTION EN BASE
             QSqlQuery addStructAttInVOIES;
-            addStructAttInVOIES.prepare("UPDATE VOIES SET RTOPO = :RT, STRUCT = :S WHERE idv = :IDV ;");
+            addStructAttInVOIES.prepare("UPDATE VOIES SET DEGREE = :D, RTOPO = :RT, STRUCT = :S WHERE idv = :IDV ;");
             addStructAttInVOIES.bindValue(":IDV",idv1 );
+            addStructAttInVOIES.bindValue(":D",m_VoieVoies.at(idv1).size());
             addStructAttInVOIES.bindValue(":RT",rayonTopologique_v);
             addStructAttInVOIES.bindValue(":S",structuralite_v);
 
@@ -3404,6 +3405,11 @@ bool Voies::do_Att_Voie(bool connexion, bool use, bool inclusion, bool gradient)
 
     // Calcul de la structuralite
     if (! calcStructuralite()) {
+        if (! pDatabase->dropColumn("VOIES", "DEGREE")) {
+            pLogger->ERREUR("calcStructuralite en erreur, ROLLBACK (drop column DEGREE) echoue");
+        } else {
+            pLogger->INFO("calcStructuralite en erreur, ROLLBACK (drop column DEGREE) reussi");
+        }
         if (! pDatabase->dropColumn("VOIES", "RTOPO")) {
             pLogger->ERREUR("calcStructuralite en erreur, ROLLBACK (drop column RTOPO) echoue");
         } else {
