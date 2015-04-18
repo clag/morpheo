@@ -36,7 +36,9 @@ public:
     bool do_Voies();
 
     //---construction des attributs de voies
-    bool do_Att_Voie(bool connexion, bool use, bool inclusion, bool gradient);
+    bool do_Att_Voie(bool connexion, bool use, bool inclusion, bool gradient, bool local_access);
+    //---construction des attributs de sif
+    bool do_Att_Arc();
 
 
 
@@ -62,9 +64,13 @@ private:
     bool calcStructuralite();
     bool calcStructRel();
     bool calcInclusion();
+    bool calcLocalAccess();
     bool calcGradient();
     bool calcConnexion();
     bool calcUse();
+
+    //---calcul des attributs d'arcs
+    bool calcBruitArcs();
 
     //---outils
     bool arcInVoie(long ida, long idv);

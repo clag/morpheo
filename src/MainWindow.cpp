@@ -122,10 +122,18 @@ void MainWindow::calculate() {
 
         ui->statusBar->showMessage("Ways' attributes in progress");
         QApplication::processEvents();
-        if (! voies_courantes->do_Att_Voie(ui->connexionCheckBox->isChecked(), ui->useCheckBox->isChecked(), ui->inclusionCheckBox->isChecked(), ui->gradientCheckBox->isChecked())) {
+        if (! voies_courantes->do_Att_Voie(ui->connexionCheckBox->isChecked(), ui->useCheckBox->isChecked(), ui->inclusionCheckBox->isChecked(), ui->gradientCheckBox->isChecked(), ui->localAccesscheckBox->isChecked())) {
             mettreEnErreur("Cannot calculate ways' attributes");
             return;
         }
+
+        ui->statusBar->showMessage("Edges' attributes in progress");
+        QApplication::processEvents();
+        if (! voies_courantes->do_Att_Arc()) {
+            mettreEnErreur("Cannot calculate edges' attributes");
+            return;
+        }
+
 
         //------------------------------- Calculs sur les arcs
         Arcs *arcs_courants = new Arcs(pDatabase, pLogger, graphe_courant, voies_courantes, methode, seuil_angle);

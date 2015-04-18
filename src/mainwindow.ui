@@ -17,10 +17,10 @@
    <widget class="QTabWidget" name="tabWidget">
     <property name="geometry">
      <rect>
-      <x>0</x>
+      <x>10</x>
       <y>10</y>
       <width>861</width>
-      <height>231</height>
+      <height>271</height>
      </rect>
     </property>
     <property name="currentIndex">
@@ -224,19 +224,6 @@
      <attribute name="title">
       <string>Process' parameters</string>
      </attribute>
-     <widget class="QPushButton" name="calculatePushButton">
-      <property name="geometry">
-       <rect>
-        <x>10</x>
-        <y>170</y>
-        <width>851</width>
-        <height>31</height>
-       </rect>
-      </property>
-      <property name="text">
-       <string>GO !</string>
-      </property>
-     </widget>
      <widget class="QGroupBox" name="optionsBox">
       <property name="geometry">
        <rect>
@@ -344,9 +331,9 @@
      <widget class="QGroupBox" name="createTablegroupBox">
       <property name="geometry">
        <rect>
-        <x>570</x>
-        <y>20</y>
-        <width>121</width>
+        <x>470</x>
+        <y>30</y>
+        <width>131</width>
         <height>91</height>
        </rect>
       </property>
@@ -376,10 +363,10 @@
      <widget class="QGroupBox" name="attributesGroupBox">
       <property name="geometry">
        <rect>
-        <x>690</x>
-        <y>20</y>
-        <width>131</width>
-        <height>131</height>
+        <x>610</x>
+        <y>10</y>
+        <width>211</width>
+        <height>221</height>
        </rect>
       </property>
       <property name="title">
@@ -390,8 +377,8 @@
         <rect>
          <x>9</x>
          <y>17</y>
-         <width>111</width>
-         <height>111</height>
+         <width>201</width>
+         <height>181</height>
         </rect>
        </property>
        <layout class="QVBoxLayout" name="attributesVerticalLayout">
@@ -435,8 +422,31 @@
           </property>
          </widget>
         </item>
+        <item>
+         <widget class="QCheckBox" name="localAccesscheckBox">
+          <property name="text">
+           <string>Local Accessibility</string>
+          </property>
+          <property name="checked">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
        </layout>
       </widget>
+     </widget>
+     <widget class="QPushButton" name="calculatePushButton">
+      <property name="geometry">
+       <rect>
+        <x>10</x>
+        <y>200</y>
+        <width>251</width>
+        <height>31</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>GO !</string>
+      </property>
      </widget>
     </widget>
     <widget class="QWidget" name="classificationTab">
@@ -663,9 +673,9 @@
     <property name="geometry">
      <rect>
       <x>10</x>
-      <y>240</y>
+      <y>280</y>
       <width>851</width>
-      <height>371</height>
+      <height>331</height>
      </rect>
     </property>
     <property name="title">
@@ -677,7 +687,7 @@
        <x>10</x>
        <y>40</y>
        <width>831</width>
-       <height>311</height>
+       <height>281</height>
       </rect>
      </property>
     </widget>

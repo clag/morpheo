@@ -3033,6 +3033,230 @@ bool Voies::calcInclusion(){
 
 }//END calcInclusion
 
+bool Voies::calcLocalAccess(){
+
+    if (! pDatabase->columnExists("VOIES", "LOCAL_ACCESS1") || ! pDatabase->columnExists("VOIES", "LOCAL_ACCESS2") || ! pDatabase->columnExists("VOIES", "LOCAL_ACCESS3")) {
+        pLogger->INFO("---------------------- calcLocalAccess START ----------------------");
+
+        // AJOUT DE L'ATTRIBUT D'ACCESSIBILITE LOCALE
+        QSqlQueryModel addLAInVOIES;
+        addLAInVOIES.setQuery("ALTER TABLE VOIES ADD LOCAL_ACCESS1 integer, ADD LOCAL_ACCESS2 integer, ADD LOCAL_ACCESS3 integer;");
+
+        if (addLAInVOIES.lastError().isValid()) {
+            pLogger->ERREUR(QString("Impossible d'ajouter les attributs d'accessibilité locale dans VOIES : %1").arg(addLAInVOIES.lastError().text()));
+            return false;
+        }
+
+        QSqlQueryModel *degreeFromVOIES = new QSqlQueryModel();
+
+        degreeFromVOIES->setQuery("SELECT IDV, DEGREE AS DEGREE_VOIE FROM VOIES;");
+
+        if (degreeFromVOIES->lastError().isValid()) {
+            pLogger->ERREUR(QString("Impossible de recuperer les degres dans VOIES pour calculer l'acessibilite locale: %1").arg(degreeFromVOIES->lastError().text()));
+            return false;
+        }//end if : test requete QSqlQueryModel
+
+        //CREATION DU TABLEAU DONNANT LA STRUCTURALITE DE CHAQUE VOIE
+        float degree_voie[m_nbVoies + 1];
+
+        for(int i = 0; i < m_nbVoies + 1; i++){
+            degree_voie[i] = 0;
+        }
+
+        for(int v = 0; v < m_nbVoies; v++){
+            int idv = degreeFromVOIES->record(v).value("IDV").toInt();
+            degree_voie[idv]=degreeFromVOIES->record(v).value("DEGREE_VOIE").toFloat();
+        }//end for v
+
+        //SUPPRESSION DE L'OBJET
+        delete degreeFromVOIES;
+
+        for(int idv1 = 1; idv1 < m_nbVoies + 1; idv1++){
+
+            float loc_acc_1 = 0;
+            float loc_acc_2 = 0;
+            float loc_acc_3 = 0;
+
+            //on cherche toutes les voies connectées à idv1
+            for (int v2 = 0; v2 < m_VoieVoies.at(idv1).size(); v2 ++) {
+                long idv2 = m_VoieVoies.at(idv1).at(v2);
+                loc_acc_1 += degree_voie[idv2];
+                loc_acc_2 += degree_voie[idv2];
+                loc_acc_3 += degree_voie[idv2];
+
+                //on cherche toutes les voies connectées à idv2
+                for (int v3 = 0; v3 < m_VoieVoies.at(idv2).size(); v3 ++) {
+                    long idv3 = m_VoieVoies.at(idv2).at(v3);
+                    loc_acc_2 += degree_voie[idv3];
+                    loc_acc_3 += degree_voie[idv3];
+
+                    //on cherche toutes les voies connectées à idv3
+                    for (int v4 = 0; v4 < m_VoieVoies.at(idv3).size(); v4 ++) {
+                        long idv4= m_VoieVoies.at(idv3).at(v4);
+                        loc_acc_3 += degree_voie[idv4];
+
+                    }//end for v4
+
+                }//end for v3
+
+            }//end for v2
+
+
+            //INSERTION EN BASE
+            QSqlQuery addInclAttInVOIES;
+            addInclAttInVOIES.prepare("UPDATE VOIES SET LOCAL_ACCESS1 = :LA1, LOCAL_ACCESS2 = :LA2, LOCAL_ACCESS3 = :LA3 WHERE idv = :IDV ;");
+            addInclAttInVOIES.bindValue(":IDV",idv1 );
+            addInclAttInVOIES.bindValue(":LA1",loc_acc_1);
+            addInclAttInVOIES.bindValue(":LA2",loc_acc_2);
+            addInclAttInVOIES.bindValue(":LA3",loc_acc_3);
+
+            if (! addInclAttInVOIES.exec()) {
+                pLogger->ERREUR(QString("Impossible d'inserer l'accessibilite locale 1 %1 2 %2 et 3 %3 pour la voie %4").arg(loc_acc_1).arg(loc_acc_2).arg(loc_acc_3).arg(idv1));
+                pLogger->ERREUR(addInclAttInVOIES.lastError().text());
+                return false;
+            }
+
+        }//end for idv1
+
+        if (! pDatabase->add_att_cl("VOIES", "CL_LA1", "LOCAL_ACCESS1", 10, true)) return false;
+        if (! pDatabase->add_att_cl("VOIES", "CL_LA2", "LOCAL_ACCESS2", 10, true)) return false;
+        if (! pDatabase->add_att_cl("VOIES", "CL_LA3", "LOCAL_ACCESS3", 10, true)) return false;
+
+    } else {
+        pLogger->INFO("---------------- Local Access attributes already in VOIES -----------------");
+    }
+
+    return true;
+
+}//END calcLocalAccess
+
+bool Voies::calcBruitArcs(){
+
+    if (! pDatabase->columnExists("SIF", "BRUIT_1") || ! pDatabase->columnExists("SIF", "BRUIT_2")  || ! pDatabase->columnExists("SIF", "BRUIT_3")  || ! pDatabase->columnExists("SIF", "BRUIT_4")) {
+        pLogger->INFO("---------------------- calcBruitArcs START ----------------------");
+
+        // AJOUT DE L'ATTRIBUT DE BRUIT
+        QSqlQueryModel addBruitInSIF;
+        addBruitInSIF.setQuery("ALTER TABLE SIF ADD BRUIT_1 float, ADD BRUIT_2 float, ADD BRUIT_3 float, ADD BRUIT_4 float;");
+
+        if (addBruitInSIF.lastError().isValid()) {
+            pLogger->ERREUR(QString("Impossible d'ajouter les attributs de bruit dans SIF : %1").arg(addBruitInSIF.lastError().text()));
+            return false;
+        }
+
+        QSqlQueryModel *attFromSIF = new QSqlQueryModel();
+
+        attFromSIF->setQuery("SELECT IDA, SI, SF, IDV, ST_length(GEOM) as LENGTH FROM SIF;");
+
+        if (attFromSIF->lastError().isValid()) {
+            pLogger->ERREUR(QString("Impossible de recuperer les attributs dans SIF: %1").arg(attFromSIF->lastError().text()));
+            return false;
+        }//end if : test requete QSqlQueryModel
+
+        int nbArcs = attFromSIF->rowCount();
+
+        //CREATION DU TABLEAU DONNANT LES ATTRIBUTS DE CHAQUE ARC
+        int idv_arc[nbArcs + 1];
+        int si_arc[nbArcs + 1];
+        int sf_arc[nbArcs + 1];
+        float length_arc[nbArcs + 1];
+
+        for(int i = 0; i < nbArcs + 1; i++){
+            idv_arc[i] = 0;
+            si_arc[i] = 0;
+            sf_arc[i] = 0;
+            length_arc[i] = 0;
+        }
+
+        for(int a = 0; a < nbArcs; a++){
+            int ida = attFromSIF->record(a).value("IDA").toInt();
+            idv_arc[ida]=attFromSIF->record(a).value("IDV").toInt();
+            si_arc[ida]=attFromSIF->record(a).value("SI").toInt();
+            sf_arc[ida]=attFromSIF->record(a).value("SF").toInt();
+            length_arc[ida]=attFromSIF->record(a).value("LENGTH").toInt();
+        }//end for v
+
+        //SUPPRESSION DE L'OBJET
+        delete attFromSIF;
+
+        for(int ida1 = 1; ida1 < nbArcs + 1; ida1++){
+
+            float bruit_1 = 0;
+            float bruit_2 = 0;
+            float bruit_3 = 0;
+            float bruit_4 = 0;
+
+            int arc_comb1 = 0;
+            int arc_comb2 = 0;
+            int arc_comb3 = 0;
+            int arc_comb4 = 0;
+
+            //on parcourt l'ensemble des arcs du tableau
+            for (int ida2 = 1; ida2 < nbArcs + 1; ida2 ++) {
+
+                if((ida1 != ida2 && ida2 != arc_comb1 && ida2 != arc_comb2 && ida2 != arc_comb3) //l'arc est différent de ceux qu'on a déjà
+                && (idv_arc[ida1] == idv_arc[ida2]) // les deux arcs sont sur la même voie
+                && (si_arc[ida1]==si_arc[ida2] || si_arc[ida1]==sf_arc[ida2] || sf_arc[ida1]==sf_arc[ida2] || sf_arc[ida1]==si_arc[ida2]) // les deux arcs partagent un sommet
+                ){
+
+                    pLogger->INFO(QString("*************Arc de base : %1").arg(ida1));
+
+                        if(bruit_1 == 0){
+                            bruit_1 = length_arc[ida1] / (length_arc[ida1] + length_arc[ida2]);
+                            arc_comb1 = ida2;
+                            pLogger->INFO(QString("Combine 1 : %1, bruit : %2").arg(arc_comb1).arg(bruit_1));
+                        }
+                        else if(bruit_2 == 0){
+                            bruit_2 = length_arc[ida1] / (length_arc[ida1] + length_arc[ida2]);
+                            arc_comb2 = ida2;
+                            pLogger->INFO(QString("Combine 2 : %1, bruit : %2").arg(arc_comb2).arg(bruit_2));
+                        }
+                        else if(bruit_3 == 0){ // cas d'une boucle
+                            bruit_3 = length_arc[ida1] / (length_arc[ida1] + length_arc[ida2]);
+                            arc_comb3 = ida2;
+                            pLogger->INFO(QString("Combine 3 : %1, bruit : %2").arg(arc_comb3).arg(bruit_3));
+
+                        }
+                        else if(bruit_4 == 0){ // cas d'une boucle
+                            bruit_4 = length_arc[ida1] / (length_arc[ida1] + length_arc[ida2]);
+                            arc_comb4 = ida2;
+                            pLogger->INFO(QString("Combine 4 : %1, bruit : %2").arg(arc_comb4).arg(bruit_4));
+
+                        }else{
+                        pLogger->ERREUR(QString("Problème : les quatre bruits sont remplis : B1 = %1 (arc %2) ; B2 = %3 (arc %4) ; B3 = %5 (arc %6) pour l'arc ida1 = %4").arg(bruit_1).arg(arc_comb1).arg(bruit_2).arg(arc_comb2).arg(bruit_3).arg(arc_comb3).arg(ida1));
+                        return false;
+                        }
+                }
+
+            }//end for a2
+
+
+            //INSERTION EN BASE
+            QSqlQuery addBruitAttInSIF;
+            addBruitAttInSIF.prepare("UPDATE SIF SET BRUIT_1 = :B1, BRUIT_2 = :B2, BRUIT_3 = :B3, BRUIT_4 = :B4 WHERE ida = :IDA ;");
+            addBruitAttInSIF.bindValue(":IDA",ida1 );
+            addBruitAttInSIF.bindValue(":B1",bruit_1);
+            addBruitAttInSIF.bindValue(":B2",bruit_2);
+            addBruitAttInSIF.bindValue(":B3",bruit_3);
+            addBruitAttInSIF.bindValue(":B4",bruit_4);
+
+            if (! addBruitAttInSIF.exec()) {
+                pLogger->ERREUR(QString("Impossible d'inserer les bruits 1 %1, 2 %2 et 3 %3 pour l'arc' %4").arg(bruit_1).arg(bruit_2).arg(bruit_3).arg(ida1));
+                pLogger->ERREUR(addBruitAttInSIF.lastError().text());
+                return false;
+            }
+
+        }//end for ida1
+
+    } else {
+        pLogger->INFO("---------------- Bruit already in SIF -----------------");
+    }
+
+    return true;
+
+}//END calcBruitArcs
+
+
 bool Voies::calcGradient(){
 
     if (! pDatabase->columnExists("VOIES", "GRAD") || ! pDatabase->columnExists("VOIES", "GRAD_MOY")) {
@@ -3401,7 +3625,35 @@ bool Voies::do_Voies(){
 //
 //***************************************************************************************************************************************************
 
-bool Voies::do_Att_Voie(bool connexion, bool use, bool inclusion, bool gradient){
+bool Voies::do_Att_Arc(){
+
+        if (! calcBruitArcs()) {
+            if (! pDatabase->dropColumn("SIF", "BRUIT_1")) {
+                pLogger->ERREUR("calcBruitArcs en erreur, ROLLBACK (drop column BRUIT_1) echoue");
+            } else {
+                pLogger->INFO("calcBruitArcs en erreur, ROLLBACK (drop column BRUIT_1) reussi");
+            }
+            if (! pDatabase->dropColumn("SIF", "BRUIT_2")) {
+                pLogger->ERREUR("calcBruitArcs en erreur, ROLLBACK (drop column BRUIT_2) echoue");
+            } else {
+                pLogger->INFO("calcBruitArcs en erreur, ROLLBACK (drop column BRUIT_2) reussi");
+            }
+            if (! pDatabase->dropColumn("SIF", "BRUIT_3")) {
+                pLogger->ERREUR("calcBruitArcs en erreur, ROLLBACK (drop column BRUIT_3) echoue");
+            } else {
+                pLogger->INFO("calcBruitArcs en erreur, ROLLBACK (drop column BRUIT_3) reussi");
+            }
+            if (! pDatabase->dropColumn("SIF", "BRUIT_4")) {
+                pLogger->ERREUR("calcBruitArcs en erreur, ROLLBACK (drop column BRUIT_3) echoue");
+            } else {
+                pLogger->INFO("calcBruitArcs en erreur, ROLLBACK (drop column BRUIT_3) reussi");
+            }
+            return false;
+        }
+
+}//end do_Att_Arc
+
+bool Voies::do_Att_Voie(bool connexion, bool use, bool inclusion, bool gradient, bool local_access){
 
     // Calcul de la structuralite
     if (! calcStructuralite()) {
@@ -3609,6 +3861,26 @@ bool Voies::do_Att_Voie(bool connexion, bool use, bool inclusion, bool gradient)
             pLogger->ERREUR("calcInclusion en erreur, ROLLBACK (drop column INCL_MOY) echoue");
         } else {
             pLogger->INFO("calcInclusion en erreur, ROLLBACK (drop column INCL_MOY) reussi");
+        }
+        return false;
+    }
+
+    // Calcul de l'accebilité locale
+    if(local_access && ! calcLocalAccess() ){
+        if (! pDatabase->dropColumn("VOIES", "LOCAL_ACCESS1")) {
+            pLogger->ERREUR("calcLocalAccess en erreur, ROLLBACK (drop column LOCAL_ACCESS1) echoue");
+        } else {
+            pLogger->INFO("calcLocalAccess en erreur, ROLLBACK (drop column LOCAL_ACCESS1) reussi");
+        }
+        if (! pDatabase->dropColumn("VOIES", "LOCAL_ACCESS2")) {
+            pLogger->ERREUR("calcLocalAccess en erreur, ROLLBACK (drop column LOCAL_ACCESS2) echoue");
+        } else {
+            pLogger->INFO("calcLocalAccess en erreur, ROLLBACK (drop column LOCAL_ACCESS2) reussi");
+        }
+        if (! pDatabase->dropColumn("VOIES", "LOCAL_ACCESS3")) {
+            pLogger->ERREUR("calcLocalAccess en erreur, ROLLBACK (drop column LOCAL_ACCESS3) echoue");
+        } else {
+            pLogger->INFO("calcLocalAccess en erreur, ROLLBACK (drop column LOCAL_ACCESS3) reussi");
         }
         return false;
     }
