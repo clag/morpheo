@@ -729,7 +729,9 @@ bool Voies::buildVectors(){
             for(int v = 0; v < m_SomVoies[ids].size(); v++){
 
                 long idv2 = m_SomVoies[ids][v];
-                m_VoieVoies[idv1].push_back(idv2);
+                if(idv2 != idv1){
+                    m_VoieVoies[idv1].push_back(idv2);
+                }
 
             }//end for v (voies passant par les sommets sur la voie)
 
@@ -1243,6 +1245,11 @@ bool Voies::calcStructuralite(){
 
             }//end for l (calcul de l'ordre de la voie)
 
+            //cout<<endl<<"*******VOIE IDV : "<<idv1<<endl;
+            //for(int i=0; i <m_VoieVoies.at(idv1).size(); i++){
+            //    cout<<"voie connectee : "<<m_VoieVoies.at(idv1).at(i)<<endl;
+            //}
+
             //INSERTION EN BASE
             QSqlQuery addStructAttInVOIES;
             addStructAttInVOIES.prepare("UPDATE VOIES SET DEGREE = :D, RTOPO = :RT, STRUCT = :S WHERE idv = :IDV ;");
@@ -1375,14 +1382,14 @@ bool Voies::calcStructRel(){
         }
 
 
-        cout<<"m_struct_tot : "<<m_struct_tot<<endl;
+        //cout<<"m_struct_tot : "<<m_struct_tot<<endl;
 
          //POUR LE TABLEAU DES 10 MEILLEURES STRUCTURALITES
 
         //affichage du tableau des 10 meilleures structuralités
-        for(int v = 1; v < 10; v++){
-            cout<<"struct_voie_sorted10["<<v<<"] : "<<struct_voie_sorted10[v]<<endl<<endl;
-        }//end for v
+        //for(int v = 1; v < 10; v++){
+        //    cout<<"struct_voie_sorted10["<<v<<"] : "<<struct_voie_sorted10[v]<<endl<<endl;
+        //}//end for v
 
         for(int v = 1; v < m_nbVoies + 1; v++){
             if(struct_voie[v] < struct_voie_sorted10[0] && struct_voie[v]!=0 ){
@@ -1547,9 +1554,9 @@ bool Voies::calcStructRel(){
         delete structFromVOIES;
 
         //affichage du tableau des 10 meilleures structuralités
-        for(int v = 1; v < 10; v++){
-            cout<<"struct_voie_sorted10["<<v<<"] : "<<struct_voie_sorted10[v]<<endl;
-        }//end for v
+        //for(int v = 1; v < 10; v++){
+        //    cout<<"struct_voie_sorted10["<<v<<"] : "<<struct_voie_sorted10[v]<<endl;
+        //}//end for v
 
         //tableau des distances topologiques
         int dtopo_voies_scl0[m_nbVoies + 1];
