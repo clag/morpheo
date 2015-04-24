@@ -281,7 +281,7 @@ bool Graphe::build_ANGLES(){
         pLogger->INFO("-------------------------- build_ANGLES START ------------------------");
 
         QSqlQueryModel createTableANGLES;
-        createTableANGLES.setQuery("CREATE TABLE ANGLES (ID SERIAL NOT NULL PRIMARY KEY, IDS bigint, IDA1 bigint, IDA2 bigint, ANGLE double precision, USED boolean, "
+        createTableANGLES.setQuery("CREATE TABLE ANGLES (ID SERIAL NOT NULL PRIMARY KEY, IDS bigint, IDA1 bigint, IDA2 bigint, ANGLE float, USED boolean, "
                                 "FOREIGN KEY (IDS) REFERENCES SXYZ(IDS), FOREIGN KEY (IDA1) REFERENCES SIF(IDA), FOREIGN KEY (IDA2) REFERENCES SIF(IDA) );");
 
         if (createTableANGLES.lastError().isValid()) {
@@ -317,7 +317,7 @@ bool Graphe::build_ANGLES(){
 
                 // On traite le cas particulier de l'arc boucle (si = sf)
                 if (si1 == sf1 && si1 == s) {
-                    double angle = fabs(azi1 - azf1);
+                    float angle = fabs(azi1 - azf1);
                     if (angle > 180.) angle = 360.0 - angle;
                     angle = fabs(angle - 180.);
 
@@ -342,7 +342,7 @@ bool Graphe::build_ANGLES(){
                     int azf2 = modelArcs->record(a2).value("AF").toDouble();
 
                     if (si1 == si2 && si1 == s) {
-                        double angle = fabs(azi1 - azi2);
+                        float angle = fabs(azi1 - azi2);
                         if (angle > 180.) angle = 360.0 - angle;
                         angle = fabs(angle - 180.);
 
@@ -358,7 +358,7 @@ bool Graphe::build_ANGLES(){
                     }
 
                     if (sf1 == si2 && sf1 == s) {
-                        double angle = fabs(azf1 - azi2);
+                        float angle = fabs(azf1 - azi2);
                         if (angle > 180.) angle = 360.0 - angle;
                         angle = fabs(angle - 180.);
 
@@ -374,7 +374,7 @@ bool Graphe::build_ANGLES(){
                     }
 
                     if (si1 == sf2 && si1 == s) {
-                        double angle = fabs(azi1 - azf2);
+                        float angle = fabs(azi1 - azf2);
                         if (angle > 180.) angle = 360.0 - angle;
                         angle = fabs(angle - 180.);
 
@@ -390,7 +390,7 @@ bool Graphe::build_ANGLES(){
                     }
 
                     if (sf1 == sf2 && sf1 == s) {
-                        double angle = fabs(azf1 - azf2);
+                        float angle = fabs(azf1 - azf2);
                         if (angle > 180.) angle = 360.0 - angle;
                         angle = fabs(angle - 180.);
 
@@ -716,7 +716,7 @@ bool Graphe::getSommetsOfArcs(int ida, int* si, int* sf) {
     return true;
 }
 
-double Graphe::getAngle(int ids, int ida1, int ida2) {
+float Graphe::getAngle(int ids, int ida1, int ida2) {
     QSqlQuery queryAngle;
     queryAngle.prepare("SELECT ANGLE FROM ANGLES WHERE (IDS = :IDS) AND ((IDA1 = :IDARC11 AND IDA2 = :IDARC21)  OR (IDA2 = :IDARC12 AND IDA1 = :IDARC22));");
 
@@ -731,12 +731,12 @@ double Graphe::getAngle(int ids, int ida1, int ida2) {
         return -1;
     }
 
-    double angle = -1;
+    float angle = -1;
     int nb_res = 0;
 
     if (queryAngle.next()) {
 
-        angle = queryAngle.record().value(0).toDouble();
+        angle = queryAngle.record().value(0).toFloat();
         nb_res++;
 
         while(queryAngle.next()){
@@ -744,8 +744,8 @@ double Graphe::getAngle(int ids, int ida1, int ida2) {
             pLogger->INFO(QString("angle trouve entre les arcs %1 et %2 au sommet %3 : %4").arg(ida1).arg(ida2).arg(ids).arg(queryAngle.record().value(0).toDouble()));
 
             nb_res ++;
-            if(queryAngle.record().value(0).toDouble() < angle){
-                angle = queryAngle.record().value(0).toDouble();
+            if(queryAngle.record().value(0).toFloat() < angle){
+                angle = queryAngle.record().value(0).toFloat();
             }
         }
 

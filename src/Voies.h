@@ -67,6 +67,7 @@ private:
     bool calcLocalAccess();
     bool calcGradient();
     bool calcConnexion();
+    bool calcOrthoVoies();
     bool calcUse();
 
     //---calcul des attributs d'arcs

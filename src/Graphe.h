@@ -34,7 +34,7 @@ public:
     QVector<long>* getArcsOfSommet(int ids) {return &(m_SomArcs[ids]);}
     //bool build_ArcsAzFromSommet(int ids, int buffer);
     bool getSommetsOfArcs(int ida, int* si, int* sf);
-    double getAngle(int ids, int ida1, int ida2);
+    float getAngle(int ids, int ida1, int ida2);
     bool checkAngle(int ids, int ida1, int ida2);
 
 private:

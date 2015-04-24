@@ -9,14 +9,14 @@ using namespace std;
 
 namespace WayMethods {
 
-    int numMethods = 4;
+int numMethods = 4;
 
-    QString MethodeVoies_name[4] = {
-        "Choix des couples par angles minimum",
-        "Choix des couples par somme minimale des angles",
-        "Choix des couples aleatoire",
-        "Une voie = un arc"
-    };
+QString MethodeVoies_name[4] = {
+    "Choix des couples par angles minimum",
+    "Choix des couples par somme minimale des angles",
+    "Choix des couples aleatoire",
+    "Une voie = un arc"
+};
 }
 
 Voies::Voies(Database* db, Logger* log, Graphe* graphe, WayMethods::methodID methode, double seuil, QString rawTableName, QString directory)
@@ -275,7 +275,7 @@ bool Voies::findCouplesAngleSommeMin(int ids, int N_couples, int pos_couple, int
 
                 }//end for j
 
-             }//end if (!arcs_utilises.at(i))
+            }//end if (!arcs_utilises.at(i))
 
         }//end for i
 
@@ -355,12 +355,12 @@ bool Voies::findCouplesArcs(int ids)
     else{
 
         for (int i=0; i<arcs->size(); i++){
-             long a = arcs->at(i);
+            long a = arcs->at(i);
 
-             m_Couples[a].push_back(ids);
-             m_Couples[a].push_back(0); //on l'ajoute comme arc terminal (en couple avec 0)
-             m_Impasses.push_back(a); // Ajout comme impasse
-             m_nbCelibataire++;
+            m_Couples[a].push_back(ids);
+            m_Couples[a].push_back(0); //on l'ajoute comme arc terminal (en couple avec 0)
+            m_Impasses.push_back(a); // Ajout comme impasse
+            m_nbCelibataire++;
         }
 
     }
@@ -437,123 +437,123 @@ bool Voies::buildCouples(){
 
             switch(m_methode) {
 
-                case WayMethods::ANGLE_MIN:
-                    if (! findCouplesAngleMin(ids)) return false;
-                    break;
+            case WayMethods::ANGLE_MIN:
+                if (! findCouplesAngleMin(ids)) return false;
+                break;
 
-                case WayMethods::ANGLE_SOMME_MIN:
-                    {
-                    //nombre de possibilites
-                    int N_couples = N_arcs / 2;
-                    float nb_possib=1;
-                    int N = N_arcs;
-                    while(N>2){
-                        nb_possib = nb_possib * ((N*(N-1))/2);
-                        N -= 2;
-                    }//end while
+            case WayMethods::ANGLE_SOMME_MIN:
+            {
+                //nombre de possibilites
+                int N_couples = N_arcs / 2;
+                float nb_possib=1;
+                int N = N_arcs;
+                while(N>2){
+                    nb_possib = nb_possib * ((N*(N-1))/2);
+                    N -= 2;
+                }//end while
 
-                    //VECTEUR INDIQUANT SI L'ARC A DEJA ETE UTILISE OU PAS
-                    QVector< QVector<bool> >* V_utArcs = new QVector<  QVector<bool> >(N_arcs);
+                //VECTEUR INDIQUANT SI L'ARC A DEJA ETE UTILISE OU PAS
+                QVector< QVector<bool> >* V_utArcs = new QVector<  QVector<bool> >(N_arcs);
+
+                for(int i=0; i<N_arcs; i++){
+                    (*V_utArcs)[i].resize(N_couples+1);
+                    for(int j=0; j<(*V_utArcs)[i].size(); j++){
+                        (*V_utArcs)[i][j]=false;
+                    }//end for j
+                }//end for i
+
+                //position dans ce vecteur (colonne)
+                int pos_ut = 0;
+
+                int pos_couple = 1;
+                int lsom = 0;
+
+                //VECTEUR DE SOMMES ET D'ARCS
+                QVector< QVector<double> >* V_sommeArc = new QVector<  QVector<double> >(nb_possib);
+                for(int i=0; i<V_sommeArc->size(); i++){
+                    (*V_sommeArc)[i].resize(N_arcs+1);
+                    (*V_sommeArc)[i][0]=0;
+                    for(int j=1; j<V_sommeArc->at(i).size(); j++){
+                        (*V_sommeArc)[i][j] = -1;
+                    }//end for j
+                }//end for i
+
+
+                //RECHERCHE DES PAIRES
+                if (! findCouplesAngleSommeMin(ids, N_couples, pos_couple, lsom, pos_ut, V_utArcs, V_sommeArc, nb_possib)) {
+                    return false;
+                }
+
+                //RESULTAT POUR LE SOMMET S (IDS = S+1)
+
+                double somme_min = N_couples*m_seuil_angle;
+                int lsom_min = 0;
+
+                //pour chaque somme calculee
+                for(int lsom = 0; lsom < V_sommeArc->size(); lsom++){
+
+                    // SOMME = V_sommeArc[lsom][0]
+
+                    if(V_sommeArc->at(lsom)[0] < somme_min){
+
+                        lsom_min = lsom;
+                        somme_min = V_sommeArc->at(lsom)[0];
+
+                    }//endif nouvelle somme min
+
+                }//end for lsom
+
+                if(somme_min < N_couples*m_seuil_angle){
+
+                    for(int i=1; i < V_sommeArc->at(lsom_min).size()-1; i+=2){
+                        int a1 = V_sommeArc->at(lsom_min).at(i);
+                        int a2 = V_sommeArc->at(lsom_min).at(i+1);
+
+                        m_Couples[a1].push_back(ids);
+                        m_Couples[a1].push_back(a2);
+                        m_Couples[a2].push_back(ids);
+                        m_Couples[a2].push_back(a1);
+
+                        m_nbCouples++;
+
+                    }//end for a
+
+                    if (N_arcs%2 == 1) {
+                        int a = V_sommeArc->at(lsom_min).last();
+                        m_Couples[a].push_back(ids);
+                        m_Couples[a].push_back(0);
+                        m_Impasses.push_back(a);
+                        m_nbCelibataire++;
+                    }
+
+                } else {
+                    QVector<long>* arcs = m_Graphe->getArcsOfSommet(ids);
 
                     for(int i=0; i<N_arcs; i++){
-                        (*V_utArcs)[i].resize(N_couples+1);
-                        for(int j=0; j<(*V_utArcs)[i].size(); j++){
-                            (*V_utArcs)[i][j]=false;
-                        }//end for j
+
+                        int a = arcs->at(i);
+                        m_Couples[a].push_back(ids);
+                        m_Couples[a].push_back(0);
+                        m_Impasses.push_back(a);
+                        m_nbCelibataire++;
                     }//end for i
 
-                    //position dans ce vecteur (colonne)
-                    int pos_ut = 0;
+                }
 
-                    int pos_couple = 1;
-                    int lsom = 0;
+                break;
+            }
 
-                    //VECTEUR DE SOMMES ET D'ARCS
-                    QVector< QVector<double> >* V_sommeArc = new QVector<  QVector<double> >(nb_possib);
-                    for(int i=0; i<V_sommeArc->size(); i++){
-                        (*V_sommeArc)[i].resize(N_arcs+1);
-                        (*V_sommeArc)[i][0]=0;
-                        for(int j=1; j<V_sommeArc->at(i).size(); j++){
-                            (*V_sommeArc)[i][j] = -1;
-                        }//end for j
-                    }//end for i
+            case WayMethods::ANGLE_RANDOM:
+                if (! findCouplesRandom(ids)) return false;
+                break;
 
+            case WayMethods::ARCS:
+                if (! findCouplesArcs(ids)) return false;
+                break;
 
-                    //RECHERCHE DES PAIRES
-                    if (! findCouplesAngleSommeMin(ids, N_couples, pos_couple, lsom, pos_ut, V_utArcs, V_sommeArc, nb_possib)) {
-                        return false;
-                    }
-
-                    //RESULTAT POUR LE SOMMET S (IDS = S+1)
-
-                    double somme_min = N_couples*m_seuil_angle;
-                    int lsom_min = 0;
-
-                    //pour chaque somme calculee
-                    for(int lsom = 0; lsom < V_sommeArc->size(); lsom++){
-
-                        // SOMME = V_sommeArc[lsom][0]
-
-                        if(V_sommeArc->at(lsom)[0] < somme_min){
-
-                            lsom_min = lsom;
-                            somme_min = V_sommeArc->at(lsom)[0];
-
-                        }//endif nouvelle somme min
-
-                    }//end for lsom
-
-                    if(somme_min < N_couples*m_seuil_angle){
-
-                        for(int i=1; i < V_sommeArc->at(lsom_min).size()-1; i+=2){
-                            int a1 = V_sommeArc->at(lsom_min).at(i);
-                            int a2 = V_sommeArc->at(lsom_min).at(i+1);
-
-                            m_Couples[a1].push_back(ids);
-                            m_Couples[a1].push_back(a2);
-                            m_Couples[a2].push_back(ids);
-                            m_Couples[a2].push_back(a1);
-
-                            m_nbCouples++;
-
-                        }//end for a
-
-                        if (N_arcs%2 == 1) {
-                            int a = V_sommeArc->at(lsom_min).last();
-                            m_Couples[a].push_back(ids);
-                            m_Couples[a].push_back(0);
-                            m_Impasses.push_back(a);
-                            m_nbCelibataire++;
-                        }
-
-                    } else {
-                        QVector<long>* arcs = m_Graphe->getArcsOfSommet(ids);
-
-                        for(int i=0; i<N_arcs; i++){
-
-                            int a = arcs->at(i);
-                            m_Couples[a].push_back(ids);
-                            m_Couples[a].push_back(0);
-                            m_Impasses.push_back(a);
-                            m_nbCelibataire++;
-                        }//end for i
-
-                    }
-
-                    break;
-                    }
-
-                case WayMethods::ANGLE_RANDOM:
-                    if (! findCouplesRandom(ids)) return false;
-                    break;
-
-                case WayMethods::ARCS:
-                    if (! findCouplesArcs(ids)) return false;
-                    break;
-
-                default:
-                    pLogger->ERREUR("Methode d'appariement des arcs inconnu");
-                    return false;
+            default:
+                pLogger->ERREUR("Methode d'appariement des arcs inconnu");
+                return false;
             }
 
         } else{
@@ -623,7 +623,9 @@ bool Voies::buildVectors(){
             return false;
         }
 
-        voieS.push_back(ids_courant);
+        if (! voieS.contains(ids_courant)) {
+            voieS.push_back(ids_courant);
+        }
         m_SomVoies[ids_courant].push_back(idv);
 
         while (ida_courant) {
@@ -650,7 +652,9 @@ bool Voies::buildVectors(){
                 return false;
             }
 
-            voieS.push_back(ids_courant);
+            if (! voieS.contains(ids_courant)) {
+                voieS.push_back(ids_courant);
+            }
             m_SomVoies[ids_courant].push_back(idv);
 
         }
@@ -676,7 +680,9 @@ bool Voies::buildVectors(){
         int ida_precedent = m_Couples.at(ida_courant).at(1);
         int ids_courant = m_Couples.at(ida_courant).at(0);
 
-        voieS.push_back(ids_courant);
+        if (! voieS.contains(ids_courant)) {
+            voieS.push_back(ids_courant);
+        }
         m_SomVoies[ids_courant].push_back(idv);
 
         while (ida_courant) {
@@ -703,7 +709,9 @@ bool Voies::buildVectors(){
                 return false;
             }
 
-            voieS.push_back(ids_courant);
+            if (! voieS.contains(ids_courant)) {
+                voieS.push_back(ids_courant);
+            }
 
             m_SomVoies[ids_courant].push_back(idv);
 
@@ -890,8 +898,20 @@ bool Voies::build_VOIES(){
 
             // Pour chaque sommet appartenant a la voie, on regarde combien d'arcs lui sont connectes
             // On enleve les 2 arcs correspondant a la voie sur laquelle on se trouve
+
+            if (idv == 166) {
+                pLogger->INFO(QString("Nombre de sommets = %1").arg(m_VoieSommets[idv].size()));
+            }
+
             for(int s = 0;  s < m_VoieSommets[idv].size(); s++){
+                if (idv == 166) {
+                    pLogger->INFO(QString("    sommet = %1").arg(m_VoieSommets[idv][s]));
+                    pLogger->INFO(QString("    ancien nbc = %1").arg(nbc));
+                }
                 nbc += m_Graphe->getArcsOfSommet(m_VoieSommets[idv][s])->size()-2;
+                if (idv == 166) {
+                    pLogger->INFO(QString("    nouveau nbc = %1").arg(nbc));
+                }
             }//end for
 
             // Dans le cas d'une non boucle, on a enleve a tord 2 arcs pour les fins de voies
@@ -930,6 +950,9 @@ bool Voies::build_VOIES(){
             addIDVAttInSIF.prepare("UPDATE SIF SET IDV = :IDV WHERE ida = :IDA ;");
             addIDVAttInSIF.bindValue(":IDV",idv);
             addIDVAttInSIF.bindValue(":IDA",ida);
+
+            m_ArcVoies[ida] = idv;
+
 
             if (! addIDVAttInSIF.exec()) {
                 pLogger->ERREUR(QString("Impossible d'inserer l'identifiant %1 pour l'arc %2").arg(idv).arg(ida));
@@ -1148,7 +1171,7 @@ bool Voies::calcStructuralite(){
             V_ordreNombre.push_back(1);
             V_ordreLength.push_back(length_voie[idv1]);
 
-           //-------------------
+            //-------------------
 
             //TRAITEMENT
             while(nb_voiestraitees != m_nbVoies) {
@@ -1165,7 +1188,7 @@ bool Voies::calcStructuralite(){
                     //on cherche toutes les voies de l'ordre auquel on se trouve
                     if(dtopo_voies[idv2] == dtopo){
 
-                        for (int v2 = 0; v2 < m_VoieVoies.at(idv2).size(); v2 ++) {                            
+                        for (int v2 = 0; v2 < m_VoieVoies.at(idv2).size(); v2 ++) {
                             long idv3 = m_VoieVoies.at(idv2).at(v2);
 
                             // = si la voie n'a pas deja ete traitee
@@ -1287,13 +1310,13 @@ bool Voies::calcStructuralite(){
                     adjacencyfile << ", ";
                 }
                 else{*/
-                    adjacencystream << " ";
+                adjacencystream << " ";
                 //}
 
             }//end for i
 
-           // dtopofile << "]";
-           // adjacencyfile << "]";
+            // dtopofile << "]";
+            // adjacencyfile << "]";
 
             dtopostream << endl;
             adjacencystream << endl;
@@ -1384,7 +1407,7 @@ bool Voies::calcStructRel(){
 
         //cout<<"m_struct_tot : "<<m_struct_tot<<endl;
 
-         //POUR LE TABLEAU DES 10 MEILLEURES STRUCTURALITES
+        //POUR LE TABLEAU DES 10 MEILLEURES STRUCTURALITES
 
         //affichage du tableau des 10 meilleures structuralités
         //for(int v = 1; v < 10; v++){
@@ -1472,82 +1495,82 @@ bool Voies::calcStructRel(){
         //POUR LE TABLEAU DES 10 MEILLEURES MAILLANCES
 
         for(int v = 1; v < m_nbVoies + 1; v++){
-                 if(sol_voie[v] < sol_voie_sorted10[0] && sol_voie[v]!=0 ){
-                     sol_voie_sorted10[9] =  sol_voie_sorted10[8];
-                     sol_voie_sorted10[8] =  sol_voie_sorted10[7];
-                     sol_voie_sorted10[7] =  sol_voie_sorted10[6];
-                     sol_voie_sorted10[6] =  sol_voie_sorted10[5];
-                     sol_voie_sorted10[5] =  sol_voie_sorted10[4];
-                     sol_voie_sorted10[4] =  sol_voie_sorted10[3];
-                     sol_voie_sorted10[3] =  sol_voie_sorted10[2];
-                     sol_voie_sorted10[2] =  sol_voie_sorted10[1];
-                     sol_voie_sorted10[1] =  sol_voie_sorted10[0];
-                     sol_voie_sorted10[0] =  sol_voie[v];
-                 }
-                 else if(sol_voie[v] < sol_voie_sorted10[1] && sol_voie[v]!=0 ){
-                     sol_voie_sorted10[9] =  sol_voie_sorted10[8];
-                     sol_voie_sorted10[8] =  sol_voie_sorted10[7];
-                     sol_voie_sorted10[7] =  sol_voie_sorted10[6];
-                     sol_voie_sorted10[6] =  sol_voie_sorted10[5];
-                     sol_voie_sorted10[5] =  sol_voie_sorted10[4];
-                     sol_voie_sorted10[4] =  sol_voie_sorted10[3];
-                     sol_voie_sorted10[3] =  sol_voie_sorted10[2];
-                     sol_voie_sorted10[2] =  sol_voie_sorted10[1];
-                     sol_voie_sorted10[1] =  sol_voie[v];
-                 }
-                 else if(sol_voie[v] < sol_voie_sorted10[2] && sol_voie[v]!=0 ){
-                     sol_voie_sorted10[9] =  sol_voie_sorted10[8];
-                     sol_voie_sorted10[8] =  sol_voie_sorted10[7];
-                     sol_voie_sorted10[7] =  sol_voie_sorted10[6];
-                     sol_voie_sorted10[6] =  sol_voie_sorted10[5];
-                     sol_voie_sorted10[5] =  sol_voie_sorted10[4];
-                     sol_voie_sorted10[4] =  sol_voie_sorted10[3];
-                     sol_voie_sorted10[3] =  sol_voie_sorted10[2];
-                     sol_voie_sorted10[2] =  sol_voie[v];
-                 }
-                 else if(sol_voie[v] < sol_voie_sorted10[3] && sol_voie[v]!=0 ){
-                     sol_voie_sorted10[9] =  sol_voie_sorted10[8];
-                     sol_voie_sorted10[8] =  sol_voie_sorted10[7];
-                     sol_voie_sorted10[7] =  sol_voie_sorted10[6];
-                     sol_voie_sorted10[6] =  sol_voie_sorted10[5];
-                     sol_voie_sorted10[5] =  sol_voie_sorted10[4];
-                     sol_voie_sorted10[4] =  sol_voie_sorted10[3];
-                     sol_voie_sorted10[3] =  sol_voie[v];
-                 }
-                 else if(sol_voie[v] < sol_voie_sorted10[4] && sol_voie[v]!=0 ){
-                     sol_voie_sorted10[9] =  sol_voie_sorted10[8];
-                     sol_voie_sorted10[8] =  sol_voie_sorted10[7];
-                     sol_voie_sorted10[7] =  sol_voie_sorted10[6];
-                     sol_voie_sorted10[6] =  sol_voie_sorted10[5];
-                     sol_voie_sorted10[5] =  sol_voie_sorted10[4];
-                     sol_voie_sorted10[4] =  sol_voie[v];
-                 }
-                 else if(sol_voie[v] < sol_voie_sorted10[5] && sol_voie[v]!=0 ){
-                     sol_voie_sorted10[9] =  sol_voie_sorted10[8];
-                     sol_voie_sorted10[8] =  sol_voie_sorted10[7];
-                     sol_voie_sorted10[7] =  sol_voie_sorted10[6];
-                     sol_voie_sorted10[6] =  sol_voie_sorted10[5];
-                     sol_voie_sorted10[5] =  sol_voie[v];
-                 }
-                 else if(sol_voie[v] < sol_voie_sorted10[6] && sol_voie[v]!=0 ){
-                     sol_voie_sorted10[9] =  sol_voie_sorted10[8];
-                     sol_voie_sorted10[8] =  sol_voie_sorted10[7];
-                     sol_voie_sorted10[7] =  sol_voie_sorted10[6];
-                     sol_voie_sorted10[6] =  sol_voie[v];
-                 }
-                 else if(sol_voie[v] < sol_voie_sorted10[7] && sol_voie[v]!=0 ){
-                     sol_voie_sorted10[9] =  sol_voie_sorted10[8];
-                     sol_voie_sorted10[8] =  sol_voie_sorted10[7];
-                     sol_voie_sorted10[7] =  sol_voie[v];
-                 }
-                 else if(sol_voie[v] < sol_voie_sorted10[8] && sol_voie[v]!=0 ){
-                     sol_voie_sorted10[9] =  sol_voie_sorted10[8];
-                     sol_voie_sorted10[8] =  sol_voie[v];
-                 }
-                 else if(sol_voie[v] < sol_voie_sorted10[9] && sol_voie[v]!=0 ){
-                     sol_voie_sorted10[9] =  sol_voie[v];
-                 }
-             }//end for v
+            if(sol_voie[v] < sol_voie_sorted10[0] && sol_voie[v]!=0 ){
+                sol_voie_sorted10[9] =  sol_voie_sorted10[8];
+                sol_voie_sorted10[8] =  sol_voie_sorted10[7];
+                sol_voie_sorted10[7] =  sol_voie_sorted10[6];
+                sol_voie_sorted10[6] =  sol_voie_sorted10[5];
+                sol_voie_sorted10[5] =  sol_voie_sorted10[4];
+                sol_voie_sorted10[4] =  sol_voie_sorted10[3];
+                sol_voie_sorted10[3] =  sol_voie_sorted10[2];
+                sol_voie_sorted10[2] =  sol_voie_sorted10[1];
+                sol_voie_sorted10[1] =  sol_voie_sorted10[0];
+                sol_voie_sorted10[0] =  sol_voie[v];
+            }
+            else if(sol_voie[v] < sol_voie_sorted10[1] && sol_voie[v]!=0 ){
+                sol_voie_sorted10[9] =  sol_voie_sorted10[8];
+                sol_voie_sorted10[8] =  sol_voie_sorted10[7];
+                sol_voie_sorted10[7] =  sol_voie_sorted10[6];
+                sol_voie_sorted10[6] =  sol_voie_sorted10[5];
+                sol_voie_sorted10[5] =  sol_voie_sorted10[4];
+                sol_voie_sorted10[4] =  sol_voie_sorted10[3];
+                sol_voie_sorted10[3] =  sol_voie_sorted10[2];
+                sol_voie_sorted10[2] =  sol_voie_sorted10[1];
+                sol_voie_sorted10[1] =  sol_voie[v];
+            }
+            else if(sol_voie[v] < sol_voie_sorted10[2] && sol_voie[v]!=0 ){
+                sol_voie_sorted10[9] =  sol_voie_sorted10[8];
+                sol_voie_sorted10[8] =  sol_voie_sorted10[7];
+                sol_voie_sorted10[7] =  sol_voie_sorted10[6];
+                sol_voie_sorted10[6] =  sol_voie_sorted10[5];
+                sol_voie_sorted10[5] =  sol_voie_sorted10[4];
+                sol_voie_sorted10[4] =  sol_voie_sorted10[3];
+                sol_voie_sorted10[3] =  sol_voie_sorted10[2];
+                sol_voie_sorted10[2] =  sol_voie[v];
+            }
+            else if(sol_voie[v] < sol_voie_sorted10[3] && sol_voie[v]!=0 ){
+                sol_voie_sorted10[9] =  sol_voie_sorted10[8];
+                sol_voie_sorted10[8] =  sol_voie_sorted10[7];
+                sol_voie_sorted10[7] =  sol_voie_sorted10[6];
+                sol_voie_sorted10[6] =  sol_voie_sorted10[5];
+                sol_voie_sorted10[5] =  sol_voie_sorted10[4];
+                sol_voie_sorted10[4] =  sol_voie_sorted10[3];
+                sol_voie_sorted10[3] =  sol_voie[v];
+            }
+            else if(sol_voie[v] < sol_voie_sorted10[4] && sol_voie[v]!=0 ){
+                sol_voie_sorted10[9] =  sol_voie_sorted10[8];
+                sol_voie_sorted10[8] =  sol_voie_sorted10[7];
+                sol_voie_sorted10[7] =  sol_voie_sorted10[6];
+                sol_voie_sorted10[6] =  sol_voie_sorted10[5];
+                sol_voie_sorted10[5] =  sol_voie_sorted10[4];
+                sol_voie_sorted10[4] =  sol_voie[v];
+            }
+            else if(sol_voie[v] < sol_voie_sorted10[5] && sol_voie[v]!=0 ){
+                sol_voie_sorted10[9] =  sol_voie_sorted10[8];
+                sol_voie_sorted10[8] =  sol_voie_sorted10[7];
+                sol_voie_sorted10[7] =  sol_voie_sorted10[6];
+                sol_voie_sorted10[6] =  sol_voie_sorted10[5];
+                sol_voie_sorted10[5] =  sol_voie[v];
+            }
+            else if(sol_voie[v] < sol_voie_sorted10[6] && sol_voie[v]!=0 ){
+                sol_voie_sorted10[9] =  sol_voie_sorted10[8];
+                sol_voie_sorted10[8] =  sol_voie_sorted10[7];
+                sol_voie_sorted10[7] =  sol_voie_sorted10[6];
+                sol_voie_sorted10[6] =  sol_voie[v];
+            }
+            else if(sol_voie[v] < sol_voie_sorted10[7] && sol_voie[v]!=0 ){
+                sol_voie_sorted10[9] =  sol_voie_sorted10[8];
+                sol_voie_sorted10[8] =  sol_voie_sorted10[7];
+                sol_voie_sorted10[7] =  sol_voie[v];
+            }
+            else if(sol_voie[v] < sol_voie_sorted10[8] && sol_voie[v]!=0 ){
+                sol_voie_sorted10[9] =  sol_voie_sorted10[8];
+                sol_voie_sorted10[8] =  sol_voie[v];
+            }
+            else if(sol_voie[v] < sol_voie_sorted10[9] && sol_voie[v]!=0 ){
+                sol_voie_sorted10[9] =  sol_voie[v];
+            }
+        }//end for v
 
 
         //SUPPRESSION DE L'OBJET
@@ -2248,7 +2271,7 @@ bool Voies::calcStructRel(){
 
 
 
-             }//end for idv_ref (voie)
+            }//end for idv_ref (voie)
 
             dtopo++;
 
@@ -2609,6 +2632,111 @@ bool Voies::calcConnexion(){
 
 }//END calcConnexion
 
+bool Voies::calcOrthoVoies(){
+
+    if (! pDatabase->columnExists("VOIES", "ORTHO")) {
+        pLogger->INFO("---------------------- calcOrthoVoies START ----------------------");
+        cout<<"---------------------- calcOrthoVoies START ----------------------"<<endl;
+
+        // AJOUT DE L'ATTRIBUT D'ORTHOGONALITE
+        QSqlQueryModel addOrthoInVOIES;
+        addOrthoInVOIES.setQuery("ALTER TABLE VOIES ADD ORTHO float;");
+
+        if (addOrthoInVOIES.lastError().isValid()) {
+            pLogger->ERREUR(QString("Impossible d'ajouter l'attribut ortho dans VOIES : %1").arg(addOrthoInVOIES.lastError().text()));
+            return false;
+        }
+
+
+
+        //pour chaque voie
+        for(int idv = 1; idv <= m_nbVoies ; idv++){
+
+            float ortho = 0;
+
+            //pour chaque sommet de la voie
+            for(int sommet=0; sommet < m_VoieSommets.at(idv).size(); sommet++){
+                //on récupère les arcs liés au sommet
+                int ids = m_VoieSommets.at(idv).at(sommet);
+                QVector<long>* arcsOfSommet = m_Graphe->getArcsOfSommet(ids);
+
+                QVector<long> arcsInVoie;
+                QVector<long> arcsOutVoie;
+
+                //on cherche le ou les arcs sur la voie
+                for(int i=0; i < arcsOfSommet->size(); i++) {
+                    int arc = arcsOfSommet->at(i);
+
+                    if (m_VoieArcs.at(idv).contains(arc)) {
+                        arcsInVoie.push_back(arc);
+                    } else {
+                        arcsOutVoie.push_back(arc);
+                    }
+                }
+
+                if (arcsOutVoie.size() == 0) {
+                    continue;
+                }
+
+                QString ida1InOr = QString("ida1 = %1").arg(arcsInVoie.at(0));
+                QString ida2InOr = QString("ida2 = %1").arg(arcsInVoie.at(0));
+
+                for(int i = 1; i < arcsInVoie.size(); i++) {
+                    ida1InOr.append(QString(" OR ida1 = %1").arg(arcsInVoie.at(i)));
+                    ida2InOr.append(QString(" OR ida2 = %1").arg(arcsInVoie.at(i)));
+                }
+
+
+                for(int i=0; i < arcsOutVoie.size(); i++) {
+                    int arc = arcsOutVoie.at(i);
+                    QString req = QString("SELECT max(angle) AS maxdev FROM angles WHERE ids = %1 AND ( (ida1 = %2 AND (%3) ) OR (ida2 = %2 AND (%4) ) );").arg(ids).arg(arc).arg(ida2InOr).arg(ida1InOr);
+
+                    QSqlQueryModel reqAngleMax;
+                    reqAngleMax.setQuery(req);
+
+                    if (reqAngleMax.lastError().isValid()) {
+                        pLogger->ERREUR(QString("Impossible de récupérer angle max : %1").arg(reqAngleMax.lastError().text()));
+                        return false;
+                    }
+
+                    float maxAngle = reqAngleMax.record(0).value("maxdev").toFloat();
+                    ortho += sin(PI - maxAngle*PI/180);
+                    if (idv == 166) {
+                        pLogger->INFO(QString("Sinus ajouté : %1").arg(sin(PI - maxAngle*PI/180)));
+                    }
+                }
+
+            }//end for sommet
+
+
+
+            //INSERTION EN BASE
+
+            QString addOrtho = QString("UPDATE VOIES SET ORTHO = %1/nbc WHERE idv = %2 ;").arg(ortho).arg(idv);
+
+            QSqlQuery addOrthoInVOIES;
+            addOrthoInVOIES.prepare(addOrtho);
+
+            if (! addOrthoInVOIES.exec()) {
+                pLogger->ERREUR(QString("Impossible d'ajouter l'orthogonalite %1 dans la table VOIES : %2, erreur : %3").arg(ortho).arg(idv).arg(addOrthoInVOIES.lastError().text()));
+                return false;
+            }
+
+        }//end for idv
+
+        if (! pDatabase->add_att_cl("VOIES", "CL_ORTHO", "ORTHO", 10, true)) return false;
+
+
+
+    } else {
+        pLogger->INFO("---------------- Ortho attributes already in VOIES -----------------");
+    }
+
+    return true;
+
+}//END calcOrthoVoies
+
+
 bool Voies::calcUse(){
 
     if (! pDatabase->columnExists("VOIES", "USE") || ! pDatabase->columnExists("VOIES", "USE_MLT") || ! pDatabase->columnExists("VOIES", "USE_LGT")) {
@@ -2747,7 +2875,7 @@ bool Voies::calcUse(){
                 nb_voiestraitees = 1;
 
 
-               while(nb_voiestraitees != nbVOIESconnexes){
+                while(nb_voiestraitees != nbVOIESconnexes){
 
                     nb_voiestraitees_test = nb_voiestraitees;
 
@@ -2762,7 +2890,7 @@ bool Voies::calcUse(){
                                 for (int v2 = 0; v2 < m_VoieVoies.at(idv2).size(); v2 ++) {
                                     long idv3 = m_VoieVoies.at(idv2).at(v2);
 
-                                     if (length_voie[idv3] != -1){ //La voie idv3 existe dans la table VOIE, elle est connexe au reste
+                                    if (length_voie[idv3] != -1){ //La voie idv3 existe dans la table VOIE, elle est connexe au reste
 
                                         //si on est dans le cas d'un premier chemin le plus cout ou d'un même chemin double
                                         if(dtopo_voies[idv3] == -1 || dtopo_voies[idv3] == dtopo_voies[idv2] + 1){
@@ -2825,7 +2953,7 @@ bool Voies::calcUse(){
                                                     //IL FAUT SUPPRIMER L'ANCIEN CHEMIN AJOUTE A TORD
                                                     //REMONTEE JUSQUA L'ANCETRE COMMUN
 
-                                                 }
+                                                }
 
                                                 //IL FAUT STOCKER LE NOUVEAU
 
@@ -2842,8 +2970,8 @@ bool Voies::calcUse(){
                                                     idv_parentLGT = voie_parente[idv_filleLGT];
 
                                                     if(idv_parentLGT == -1){
-                                                       pLogger->ERREUR(QString("Probleme de voie parente non remplie ! (idv_parentLGT = %1)").arg(idv_parentLGT));
-                                                       return false;
+                                                        pLogger->ERREUR(QString("Probleme de voie parente non remplie ! (idv_parentLGT = %1)").arg(idv_parentLGT));
+                                                        return false;
                                                     }
                                                 }
 
@@ -2894,7 +3022,7 @@ bool Voies::calcUse(){
 
                                         }//end if (voie non traitee)
 
-                                     }//end if
+                                    }//end if
 
                                 }//end for v2 (idv3)
 
@@ -3202,37 +3330,39 @@ bool Voies::calcBruitArcs(){
             for (int ida2 = 1; ida2 < nbArcs + 1; ida2 ++) {
 
                 if((ida1 != ida2 && ida2 != arc_comb1 && ida2 != arc_comb2 && ida2 != arc_comb3) //l'arc est différent de ceux qu'on a déjà
-                && (idv_arc[ida1] == idv_arc[ida2]) // les deux arcs sont sur la même voie
-                && (si_arc[ida1]==si_arc[ida2] || si_arc[ida1]==sf_arc[ida2] || sf_arc[ida1]==sf_arc[ida2] || sf_arc[ida1]==si_arc[ida2]) // les deux arcs partagent un sommet
-                ){
+                        && (idv_arc[ida1] == idv_arc[ida2]) // les deux arcs sont sur la même voie
+                        && (si_arc[ida1]==si_arc[ida2] || si_arc[ida1]==sf_arc[ida2] || sf_arc[ida1]==sf_arc[ida2] || sf_arc[ida1]==si_arc[ida2]) // les deux arcs partagent un sommet
+                        && length_arc[ida1] != 0
+                        && length_arc[ida2] != 0
+                        ){
 
-                    pLogger->INFO(QString("*************Arc de base : %1").arg(ida1));
+                    //pLogger->INFO(QString("*************Arc de base : %1").arg(ida1));
 
-                        if(bruit_1 == 0){
-                            bruit_1 = length_arc[ida1] / (length_arc[ida1] + length_arc[ida2]);
-                            arc_comb1 = ida2;
-                            pLogger->INFO(QString("Combine 1 : %1, bruit : %2").arg(arc_comb1).arg(bruit_1));
-                        }
-                        else if(bruit_2 == 0){
-                            bruit_2 = length_arc[ida1] / (length_arc[ida1] + length_arc[ida2]);
-                            arc_comb2 = ida2;
-                            pLogger->INFO(QString("Combine 2 : %1, bruit : %2").arg(arc_comb2).arg(bruit_2));
-                        }
-                        else if(bruit_3 == 0){ // cas d'une boucle
-                            bruit_3 = length_arc[ida1] / (length_arc[ida1] + length_arc[ida2]);
-                            arc_comb3 = ida2;
-                            pLogger->INFO(QString("Combine 3 : %1, bruit : %2").arg(arc_comb3).arg(bruit_3));
+                    if(bruit_1 == 0){
+                        bruit_1 = length_arc[ida1] / (length_arc[ida1] + length_arc[ida2]);
+                        arc_comb1 = ida2;
+                        //pLogger->INFO(QString("Combine 1 : %1, bruit : %2").arg(arc_comb1).arg(bruit_1));
+                    }
+                    else if(bruit_2 == 0){
+                        bruit_2 = length_arc[ida1] / (length_arc[ida1] + length_arc[ida2]);
+                        arc_comb2 = ida2;
+                        //pLogger->INFO(QString("Combine 2 : %1, bruit : %2").arg(arc_comb2).arg(bruit_2));
+                    }
+                    else if(bruit_3 == 0){ // cas d'une boucle
+                        bruit_3 = length_arc[ida1] / (length_arc[ida1] + length_arc[ida2]);
+                        arc_comb3 = ida2;
+                        //pLogger->INFO(QString("Combine 3 : %1, bruit : %2").arg(arc_comb3).arg(bruit_3));
 
-                        }
-                        else if(bruit_4 == 0){ // cas d'une boucle
-                            bruit_4 = length_arc[ida1] / (length_arc[ida1] + length_arc[ida2]);
-                            arc_comb4 = ida2;
-                            pLogger->INFO(QString("Combine 4 : %1, bruit : %2").arg(arc_comb4).arg(bruit_4));
+                    }
+                    else if(bruit_4 == 0){ // cas d'une boucle
+                        bruit_4 = length_arc[ida1] / (length_arc[ida1] + length_arc[ida2]);
+                        arc_comb4 = ida2;
+                        //pLogger->INFO(QString("Combine 4 : %1, bruit : %2").arg(arc_comb4).arg(bruit_4));
 
-                        }else{
-                        pLogger->ERREUR(QString("Problème : les quatre bruits sont remplis : B1 = %1 (arc %2) ; B2 = %3 (arc %4) ; B3 = %5 (arc %6) pour l'arc ida1 = %4").arg(bruit_1).arg(arc_comb1).arg(bruit_2).arg(arc_comb2).arg(bruit_3).arg(arc_comb3).arg(ida1));
-                        return false;
-                        }
+                    }else{
+                        pLogger->ERREUR(QString("ATTENTION CAS PARTICULIER : les quatre bruits sont remplis : B1 = %1 (arc %2) ; B2 = %3 (arc %4) ; B3 = %5 (arc %6) pour l'arc ida1 = %4").arg(bruit_1).arg(arc_comb1).arg(bruit_2).arg(arc_comb2).arg(bruit_3).arg(arc_comb3).arg(ida1));
+                        //return false;
+                    }
                 }
 
             }//end for a2
@@ -3634,29 +3764,31 @@ bool Voies::do_Voies(){
 
 bool Voies::do_Att_Arc(){
 
-        if (! calcBruitArcs()) {
-            if (! pDatabase->dropColumn("SIF", "BRUIT_1")) {
-                pLogger->ERREUR("calcBruitArcs en erreur, ROLLBACK (drop column BRUIT_1) echoue");
-            } else {
-                pLogger->INFO("calcBruitArcs en erreur, ROLLBACK (drop column BRUIT_1) reussi");
-            }
-            if (! pDatabase->dropColumn("SIF", "BRUIT_2")) {
-                pLogger->ERREUR("calcBruitArcs en erreur, ROLLBACK (drop column BRUIT_2) echoue");
-            } else {
-                pLogger->INFO("calcBruitArcs en erreur, ROLLBACK (drop column BRUIT_2) reussi");
-            }
-            if (! pDatabase->dropColumn("SIF", "BRUIT_3")) {
-                pLogger->ERREUR("calcBruitArcs en erreur, ROLLBACK (drop column BRUIT_3) echoue");
-            } else {
-                pLogger->INFO("calcBruitArcs en erreur, ROLLBACK (drop column BRUIT_3) reussi");
-            }
-            if (! pDatabase->dropColumn("SIF", "BRUIT_4")) {
-                pLogger->ERREUR("calcBruitArcs en erreur, ROLLBACK (drop column BRUIT_3) echoue");
-            } else {
-                pLogger->INFO("calcBruitArcs en erreur, ROLLBACK (drop column BRUIT_3) reussi");
-            }
-            return false;
+    if (! calcBruitArcs()) {
+        if (! pDatabase->dropColumn("SIF", "BRUIT_1")) {
+            pLogger->ERREUR("calcBruitArcs en erreur, ROLLBACK (drop column BRUIT_1) echoue");
+        } else {
+            pLogger->INFO("calcBruitArcs en erreur, ROLLBACK (drop column BRUIT_1) reussi");
         }
+        if (! pDatabase->dropColumn("SIF", "BRUIT_2")) {
+            pLogger->ERREUR("calcBruitArcs en erreur, ROLLBACK (drop column BRUIT_2) echoue");
+        } else {
+            pLogger->INFO("calcBruitArcs en erreur, ROLLBACK (drop column BRUIT_2) reussi");
+        }
+        if (! pDatabase->dropColumn("SIF", "BRUIT_3")) {
+            pLogger->ERREUR("calcBruitArcs en erreur, ROLLBACK (drop column BRUIT_3) echoue");
+        } else {
+            pLogger->INFO("calcBruitArcs en erreur, ROLLBACK (drop column BRUIT_3) reussi");
+        }
+        if (! pDatabase->dropColumn("SIF", "BRUIT_4")) {
+            pLogger->ERREUR("calcBruitArcs en erreur, ROLLBACK (drop column BRUIT_3) echoue");
+        } else {
+            pLogger->INFO("calcBruitArcs en erreur, ROLLBACK (drop column BRUIT_3) reussi");
+        }
+        return false;
+    }
+
+    return true;
 
 }//end do_Att_Arc
 
@@ -3835,6 +3967,15 @@ bool Voies::do_Att_Voie(bool connexion, bool use, bool inclusion, bool gradient,
         }
         return false;
 
+    }
+
+    if( ! calcOrthoVoies()){
+        if (! pDatabase->dropColumn("VOIES", "ORTHO")) {
+            pLogger->ERREUR("calcOrthoVoies en erreur, ROLLBACK (drop column ORTHO) echoue");
+        } else {
+            pLogger->INFO("calcOrthoVoies en erreur, ROLLBACK (drop column ORTHO) reussi");
+        }
+        return false;
     }
 
     //calcul des utilisation (betweenness)
