@@ -2701,9 +2701,6 @@ bool Voies::calcOrthoVoies(){
 
                     float maxAngle = reqAngleMax.record(0).value("maxdev").toFloat();
                     ortho += sin(PI - maxAngle*PI/180);
-                    if (idv == 166) {
-                        pLogger->INFO(QString("Sinus ajouté : %1").arg(sin(PI - maxAngle*PI/180)));
-                    }
                 }
 
             }//end for sommet
@@ -2725,6 +2722,9 @@ bool Voies::calcOrthoVoies(){
         }//end for idv
 
         if (! pDatabase->add_att_cl("VOIES", "CL_ORTHO", "ORTHO", 10, true)) return false;
+
+        if (! pDatabase->add_att_div("VOIES","ROO","RTOPO","ORTHO")) return false;
+        if (! pDatabase->add_att_cl("VOIES", "CL_ROO", "ROO", 10, true)) return false;
 
 
 
