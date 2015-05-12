@@ -2744,7 +2744,7 @@ bool Voies::calcUse(){
 
         // AJOUT DE L'ATTRIBUT DE USE
         QSqlQueryModel addUseInVOIES;
-        addUseInVOIES.setQuery("ALTER TABLE VOIES ADD USE integer, ADD USE_MLT integer, ADD USE_LGT integer;");
+        addUseInVOIES.setQuery("ALTER TABLE VOIES ADD USE integer, ADD USE_MLT integer, ADD USE_MLT_MOY float, ADD USE_LGT integer;");
 
         if (addUseInVOIES.lastError().isValid()) {
             pLogger->ERREUR(QString("Impossible d'ajouter les attributs de use dans VOIES : %1").arg(addUseInVOIES.lastError().text()));
@@ -2769,6 +2769,9 @@ bool Voies::calcUse(){
         for(int v = 0; v < m_nbVoies + 1; v++){
             voie_useLGT[v] = 0;
         }//end for v
+
+        //compteur des chemin
+        int nb_chemin = 0;
 
 
         //CALCUL DU NOMBRE DE VOIES DE LA PARTIE CONNEXE
@@ -2916,6 +2919,8 @@ bool Voies::calcUse(){
                                                 }
                                             }
 
+                                            //on est dans le cas où on a trouvé un nouveau chemin, on incrémente le compteur
+                                            nb_chemin ++;
                                         }
 
                                         // = SI LA VOIE A DEJA ETE TRAITEE
@@ -3050,15 +3055,23 @@ bool Voies::calcUse(){
 
             int use_v = voie_use[idv];
             int useMLT_v = voie_useMLT[idv];
+            cout<<"nb_chemin : "<<nb_chemin<<" ; ";
+            cout<<"useMLT_v : "<<useMLT_v<<" ; ";
+            cout<<" ((float)useMLT_v / (float)nb_chemin) : "<< ((float)useMLT_v / (float)nb_chemin)<<" ; ";
+            float useMLT_moy = ((float)useMLT_v / (float)nb_chemin);
+            cout<<"useMLT_moy : "<<useMLT_moy<<endl;
+
+
 
             int useLGT_v = voie_useLGT[idv];
             if(voie_useLGT[idv] == 0){useLGT_v = voie_use[idv];}
 
             QSqlQuery addUseAttInVOIES;
-            addUseAttInVOIES.prepare("UPDATE VOIES SET USE = :USE, USE_MLT = :USE_MLT, USE_LGT = :USE_LGT WHERE idv = :IDV ;");
+            addUseAttInVOIES.prepare("UPDATE VOIES SET USE = :USE, USE_MLT = :USE_MLT, USE_MLT_MOY = :USE_MLT_MOY, USE_LGT = :USE_LGT WHERE idv = :IDV ;");
             addUseAttInVOIES.bindValue(":IDV", idv );
             addUseAttInVOIES.bindValue(":USE",use_v);
             addUseAttInVOIES.bindValue(":USE_MLT",useMLT_v);
+            addUseAttInVOIES.bindValue(":USE_MLT_MOY",useMLT_moy);
             addUseAttInVOIES.bindValue(":USE_LGT",useLGT_v);
 
             if (! addUseAttInVOIES.exec()) {
@@ -3072,6 +3085,8 @@ bool Voies::calcUse(){
         if (! pDatabase->add_att_cl("VOIES", "CL_USE", "USE", 10, true)) return false;
 
         if (! pDatabase->add_att_cl("VOIES", "CL_USEMLT", "USE_MLT", 10, true)) return false;
+
+        if (! pDatabase->add_att_cl("VOIES", "CL_USEMLTMOY", "USE_MLT_MOY", 10, true)) return false;
 
         if (! pDatabase->add_att_cl("VOIES", "CL_USELGT", "USE_LGT", 10, true)) return false;
 
