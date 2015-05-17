@@ -46,6 +46,7 @@ Voies::Voies(Database* db, Logger* log, Graphe* graphe, WayMethods::methodID met
     // indice dans le vecteur = identifiant de l'objet en base
     m_VoieArcs.push_back(QVector<long>(0));
     m_VoieSommets.push_back(QVector<long>(0));
+    m_VoieNBC.push_back(0);
 }
 
 //***************************************************************************************************************************************************
@@ -572,6 +573,16 @@ bool Voies::buildCouples(){
 
     pLogger->INFO("-------------------------- buildCouples END --------------------------");
 
+    /*
+    for (int a = 1; a < m_Couples.size(); a++) {
+        pLogger->INFO(QString("Arc %1").arg(a));
+        QString g = "";
+        for (int b = 0; b < m_Couples.at(a).size(); b++) {
+            g.append(QString(" %1").arg(m_Couples.at(a).at(b)));
+        }
+        pLogger->INFO(QString("         %1").arg(g));
+    }*/
+
     // Tests de m_Couples
     for (int a = 1; a < m_Couples.size(); a++) {
         if (m_Couples.at(a).size() != 4) {
@@ -892,33 +903,6 @@ bool Voies::build_VOIES(){
             int nba = m_VoieArcs.at(idv).size();
             int nbs = m_VoieSommets.at(idv).size();
 
-            // CALCUL DU NOMBRE DE CONNEXION DE LA VOIE
-            int nbc = 0;
-            int nbc_p = 0;
-
-            // Pour chaque sommet appartenant a la voie, on regarde combien d'arcs lui sont connectes
-            // On enleve les 2 arcs correspondant a la voie sur laquelle on se trouve
-
-            if (idv == 166) {
-                pLogger->INFO(QString("Nombre de sommets = %1").arg(m_VoieSommets[idv].size()));
-            }
-
-            for(int s = 0;  s < m_VoieSommets[idv].size(); s++){
-                if (idv == 166) {
-                    pLogger->INFO(QString("    sommet = %1").arg(m_VoieSommets[idv][s]));
-                    pLogger->INFO(QString("    ancien nbc = %1").arg(nbc));
-                }
-                nbc += m_Graphe->getArcsOfSommet(m_VoieSommets[idv][s])->size()-2;
-                if (idv == 166) {
-                    pLogger->INFO(QString("    nouveau nbc = %1").arg(nbc));
-                }
-            }//end for
-
-            // Dans le cas d'une non boucle, on a enleve a tord 2 arcs pour les fins de voies
-            if ( nba + 1 == nbs ) { nbc += 2; nbc_p = nbc - 2; }
-            else { nbc_p = nbc;}
-
-
             geomstream << idv;
             geomstream << " ";
             geomstream << geometryVoies.at(idv);
@@ -926,8 +910,8 @@ bool Voies::build_VOIES(){
 
 
 
-            QString addVoie = QString("INSERT INTO VOIES(IDV, MULTIGEOM, NBA, NBS, NBC, NBC_P) VALUES (%1, ST_LineMerge(ST_Union(ARRAY[%2])) , %3, %4, %5, %6);")
-                    .arg(idv).arg(geometryVoies.at(idv)).arg(nba).arg(nbs).arg(nbc).arg(nbc_p);
+            QString addVoie = QString("INSERT INTO VOIES(IDV, MULTIGEOM, NBA, NBS) VALUES (%1, ST_LineMerge(ST_Union(ARRAY[%2])) , %3, %4);")
+                    .arg(idv).arg(geometryVoies.at(idv)).arg(nba).arg(nbs);
 
             QSqlQuery addInVOIES;
             addInVOIES.prepare(addVoie);
@@ -974,7 +958,6 @@ bool Voies::build_VOIES(){
         // On calcule la connectivite sur la longueur
         if (! pDatabase->add_att_div("VOIES","LOC","LENGTH","NBC")) return false;
 
-        if (! pDatabase->add_att_cl("VOIES", "CL_NBC", "NBC", 10, true)) return false;
         if (! pDatabase->add_att_cl("VOIES", "CL_LOC", "LOC", 10, true)) return false;
 
 
@@ -1330,11 +1313,15 @@ bool Voies::calcStructuralite(){
         adjacencyqfile.close();
 
         if (! pDatabase->add_att_div("VOIES","SOL","STRUCT","LENGTH")) return false;
+        if (! pDatabase->add_att_div("VOIES","ROS","RTOPO","STRUCT")) return false;
 
         if (! pDatabase->add_att_cl("VOIES", "CL_S", "STRUCT", 10, true)) return false;
         if (! pDatabase->add_att_cl("VOIES", "CL_SOL", "SOL", 10, true)) return false;
+        if (! pDatabase->add_att_cl("VOIES", "CL_ROS", "ROS", 10, true)) return false;
 
         if (! pDatabase->add_att_cl("VOIES", "CL_RTOPO", "RTOPO", 10, true)) return false;
+        if (! pDatabase->add_att_cl("VOIES", "CL_LENGTH", "LENGTH", 10, true)) return false;
+        if (! pDatabase->add_att_cl("VOIES", "CL_DEGREE", "DEGREE", 10, true)) return false;
 
         if (! pDatabase->add_att_dif("VOIES", "DIFF_CL", "CL_S", "CL_RTOPO")) return false;
 
@@ -2653,6 +2640,7 @@ bool Voies::calcOrthoVoies(){
         for(int idv = 1; idv <= m_nbVoies ; idv++){
 
             float ortho = 0;
+            int nbc = 0;
 
             //pour chaque sommet de la voie
             for(int sommet=0; sommet < m_VoieSommets.at(idv).size(); sommet++){
@@ -2677,6 +2665,8 @@ bool Voies::calcOrthoVoies(){
                 if (arcsOutVoie.size() == 0) {
                     continue;
                 }
+
+                nbc += arcsOutVoie.size();
 
                 QString ida1InOr = QString("ida1 = %1").arg(arcsInVoie.at(0));
                 QString ida2InOr = QString("ida2 = %1").arg(arcsInVoie.at(0));
@@ -2706,17 +2696,33 @@ bool Voies::calcOrthoVoies(){
             }//end for sommet
 
 
+            m_VoieNBC.push_back(nbc);
 
-            //INSERTION EN BASE
+            if (nbc == 0) {
+                pLogger->ATTENTION(QString("La voie %1 a une connectivité de zéro !!").arg(idv));
 
-            QString addOrtho = QString("UPDATE VOIES SET ORTHO = %1/nbc WHERE idv = %2 ;").arg(ortho).arg(idv);
+                QString addOrtho = QString("UPDATE VOIES SET NBC = 0, ORTHO = -1 WHERE idv = %3 ;").arg(idv);
 
-            QSqlQuery addOrthoInVOIES;
-            addOrthoInVOIES.prepare(addOrtho);
+                QSqlQuery addOrthoInVOIES;
+                addOrthoInVOIES.prepare(addOrtho);
 
-            if (! addOrthoInVOIES.exec()) {
-                pLogger->ERREUR(QString("Impossible d'ajouter l'orthogonalite %1 dans la table VOIES : %2, erreur : %3").arg(ortho).arg(idv).arg(addOrthoInVOIES.lastError().text()));
-                return false;
+                if (! addOrthoInVOIES.exec()) {
+                    pLogger->ERREUR(QString("Impossible d'ajouter l'orthogonalite %1 dans la table VOIES : %2, erreur : %3").arg(ortho).arg(idv).arg(addOrthoInVOIES.lastError().text()));
+                    return false;
+                }
+            } else {
+
+                //INSERTION EN BASE
+
+                QString addOrtho = QString("UPDATE VOIES SET NBC = %1, ORTHO = %2/%1 WHERE idv = %3 ;").arg(nbc).arg(ortho).arg(idv);
+
+                QSqlQuery addOrthoInVOIES;
+                addOrthoInVOIES.prepare(addOrtho);
+
+                if (! addOrthoInVOIES.exec()) {
+                    pLogger->ERREUR(QString("Impossible d'ajouter l'orthogonalite %1 dans la table VOIES : %2, erreur : %3").arg(ortho).arg(idv).arg(addOrthoInVOIES.lastError().text()));
+                    return false;
+                }
             }
 
         }//end for idv
@@ -2725,6 +2731,9 @@ bool Voies::calcOrthoVoies(){
 
         if (! pDatabase->add_att_div("VOIES","ROO","RTOPO","ORTHO")) return false;
         if (! pDatabase->add_att_cl("VOIES", "CL_ROO", "ROO", 10, true)) return false;
+
+
+        if (! pDatabase->add_att_cl("VOIES", "CL_NBC", "NBC", 10, true)) return false;
 
 
 
@@ -3055,11 +3064,7 @@ bool Voies::calcUse(){
 
             int use_v = voie_use[idv];
             int useMLT_v = voie_useMLT[idv];
-            cout<<"nb_chemin : "<<nb_chemin<<" ; ";
-            cout<<"useMLT_v : "<<useMLT_v<<" ; ";
-            cout<<" ((float)useMLT_v / (float)nb_chemin) : "<< ((float)useMLT_v / (float)nb_chemin)<<" ; ";
             float useMLT_moy = ((float)useMLT_v / (float)nb_chemin);
-            cout<<"useMLT_moy : "<<useMLT_moy<<endl;
 
 
 
@@ -3172,6 +3177,9 @@ bool Voies::calcInclusion(){
 
         if (! pDatabase->add_att_cl("VOIES", "CL_INCL", "INCL", 10, true)) return false;
         if (! pDatabase->add_att_cl("VOIES", "CL_INCLMOY", "INCL_MOY", 10, true)) return false;
+
+        if (! pDatabase->add_att_div("VOIES","IOD","INCL","DEGREE")) return false;
+        if (! pDatabase->add_att_cl("VOIES", "CL_IOD", "IOD", 10, true)) return false;
 
         pLogger->INFO(QString("STRUCTURALITE TOTALE SUR LE RESEAU : %1").arg(m_struct_tot));
 

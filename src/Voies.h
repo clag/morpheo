@@ -103,6 +103,7 @@ private:
     // identifiants des sommets par identifiant de voie
     // ligne IDV >> IDS1, IDS2.. IDS
     QVector< QVector<long> > m_VoieSommets;
+    QVector< int > m_VoieNBC;
 
     //nombre de voies
     int m_nbVoies;
