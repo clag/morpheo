@@ -85,6 +85,9 @@ private:
     QString m_rawTableName;
     QString m_directory;
 
+    //nom du schéma de travail
+    QString m_schemaName;
+
     //nombre de couples
     int m_nbCouples;
     //nombre de célibataires

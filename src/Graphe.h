@@ -13,7 +13,7 @@ class Graphe
 {
 public:
 
-    Graphe(Database* db, Logger* log, float e = 0.001){
+    Graphe(Database* db, Logger* log, QString schemaName = "public", float e = 0.001){
         m_toleranceSommets = e;
         m_nbArcs = 0;
         m_nbSommets = 0;
@@ -22,7 +22,9 @@ public:
         m_nbIntersections = 0;
         pLogger = log;
         pDatabase = db;
+        m_schemaName = schemaName;
     }
+
     ~Graphe(){}
 
     //---construction du graphe
@@ -30,6 +32,8 @@ public:
 
     int getNombreSommets() {return m_nbSommets;}
     int getNombreArcs() {return m_nbArcs;}
+
+    QString getSchemaName() {return m_schemaName;}
 
     QVector<long>* getArcsOfSommet(int ids) {return &(m_SomArcs[ids]);}
     //bool build_ArcsAzFromSommet(int ids, int buffer);
@@ -60,6 +64,9 @@ private:
 
     //---construction de la table INFO
     bool insertINFO();
+
+    //nom du schéma de travail
+    QString m_schemaName;
 
     //nombre de sommets intersections
     int m_nbIntersections;

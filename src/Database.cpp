@@ -30,17 +30,18 @@ Database::~Database(){
 //
 //***************************************************************************************************************************************************
 
-bool Database::dropTable(QString tableName) {
+bool Database::dropTable(QString tableName, QString schemaName) {
     QSqlQuery testTable;
-    testTable.prepare("SELECT * FROM " + tableName + " LIMIT 1;");
+    QString completeTableName = schemaName + "." + tableName;
+    testTable.prepare("SELECT * FROM " + completeTableName + " LIMIT 1;");
     testTable.exec();
 
     if (! testTable.lastError().isValid()){
         QSqlQueryModel dropTable;
-        dropTable.setQuery("DROP TABLE " + tableName + " CASCADE;");
+        dropTable.setQuery("DROP TABLE " + completeTableName + " CASCADE;");
 
         if (dropTable.lastError().isValid()) {
-            emit fatal(QString("drop table %1 : %2").arg(tableName).arg(dropTable.lastError().text()));
+            emit fatal(QString("drop table %1 : %2").arg(completeTableName).arg(dropTable.lastError().text()));
             return false;
         }//end if : test requête QSqlQueryModel
 
@@ -54,22 +55,23 @@ bool Database::dropTable(QString tableName) {
 //
 //***************************************************************************************************************************************************
 
-bool Database::dropColumn(QString tableName, QString columnName) {
+bool Database::dropColumn(QString tableName, QString columnName, QString schemaName) {
     QSqlQuery testTable;
-    testTable.prepare("SELECT * FROM " + tableName + " LIMIT 1;");
+    QString completeTableName = schemaName + "." + tableName;
+    testTable.prepare("SELECT * FROM " + completeTableName + " LIMIT 1;");
     testTable.exec();
 
     if (! testTable.lastError().isValid()){
         QSqlQueryModel dropColumn;
-        dropColumn.setQuery("ALTER TABLE " + tableName + " DROP COLUMN " + columnName + ";");
+        dropColumn.setQuery("ALTER TABLE " + completeTableName + " DROP COLUMN " + columnName + ";");
 
         if (dropColumn.lastError().isValid()) {
-            emit fatal(QString("drop table %1 : %2").arg(tableName).arg(dropColumn.lastError().text()));
+            emit fatal(QString("drop table %1 : %2").arg(completeTableName).arg(dropColumn.lastError().text()));
             return false;
         }//end if : test requête QSqlQueryModel
 
     } else {
-        emit fatal(QString("drop column %1 : la table %2 censé la contenir n'existe pas").arg(columnName).arg(tableName));
+        emit fatal(QString("drop column %1 : la table %2 censé la contenir n'existe pas").arg(columnName).arg(completeTableName));
         return false;
     }
 
@@ -81,10 +83,28 @@ bool Database::dropColumn(QString tableName, QString columnName) {
 //
 //***************************************************************************************************************************************************
 
-bool Database::tableExists(QString tableName) {
+bool Database::tableExists(QString tableName, QString schemaName) {
     QSqlQuery testTable;
-    testTable.prepare("SELECT * FROM " + tableName + " LIMIT 1;");
+    QString completeTableName = schemaName + "." + tableName;
+    testTable.prepare("SELECT * FROM " + completeTableName + " LIMIT 1;");
     return testTable.exec();
+}
+
+//***************************************************************************************************************************************************
+//EXISTENCE DE SCHEMA
+//
+//***************************************************************************************************************************************************
+
+bool Database::schemaExists(QString schemaName) {
+    QSqlQuery testSchema;
+    testSchema.prepare("SELECT * FROM pg_catalog.pg_namespace WHERE nspname = '" + schemaName + "';");
+    testSchema.exec();
+
+    QSqlQueryModel testSchemaModel;
+    testSchemaModel.setQuery(testSchema);
+
+    if(testSchemaModel.rowCount() == 0) return false;
+    return true;
 }
 
 //***************************************************************************************************************************************************
@@ -92,9 +112,10 @@ bool Database::tableExists(QString tableName) {
 //
 //***************************************************************************************************************************************************
 
-bool Database::columnExists(QString tableName, QString columnName) {
+bool Database::columnExists(QString tableName, QString columnName, QString schemaName) {
     QSqlQuery testTable;
-    testTable.prepare("SELECT " + columnName + " FROM " + tableName + " LIMIT 1;");
+    QString completeTableName = schemaName + "." + tableName;
+    testTable.prepare("SELECT " + columnName + " FROM " + completeTableName + " LIMIT 1;");
     return testTable.exec();
 }
 
@@ -102,24 +123,25 @@ bool Database::columnExists(QString tableName, QString columnName) {
 //ajout d'un attribut combiné par division
 //
 //***************************************************************************************************************************************************
-bool Database::add_att_div(QString table, QString new_att, QString att_1, QString att_2){
+bool Database::add_att_div(QString table, QString new_att, QString att_1, QString att_2, QString schemaName){
+    QString completeTableName = schemaName + "." + table;
 
     //AJOUT ATTRIBUT DANS VOIES
     QSqlQueryModel addAttribute;
-    addAttribute.setQuery(QString("ALTER TABLE %1 ADD %2 %3 DEFAULT 0;").arg(table).arg(new_att).arg("double precision"));
+    addAttribute.setQuery(QString("ALTER TABLE %1 ADD %2 %3 DEFAULT 0;").arg(completeTableName).arg(new_att).arg("double precision"));
 
     if (addAttribute.lastError().isValid()) {
-        emit fatal(QString("Impossible d'ajouter l'attribut %1 dans la table %2").arg(new_att).arg(table));
+        emit fatal(QString("Impossible d'ajouter l'attribut %1 dans la table %2").arg(new_att).arg(completeTableName));
         emit fatal(addAttribute.lastError().text());
         return false;
     }
 
     //CALCUL ET INSERTION DU NOUVEL ATTRIBUT
     QSqlQueryModel updateAttribute;
-    updateAttribute.setQuery(QString("UPDATE %1 SET %2=%3/%4 WHERE %4 != 0;").arg(table).arg(new_att).arg(att_1).arg(att_2));
+    updateAttribute.setQuery(QString("UPDATE %1 SET %2=%3/%4 WHERE %4 != 0;").arg(completeTableName).arg(new_att).arg(att_1).arg(att_2));
 
     if (updateAttribute.lastError().isValid()) {
-        emit fatal(QString("Impossible de calculer le nouvel attribut %1 dans %2 par division").arg(new_att).arg(table));
+        emit fatal(QString("Impossible de calculer le nouvel attribut %1 dans %2 par division").arg(new_att).arg(completeTableName));
         emit fatal(updateAttribute.lastError().text());
         return false;
     }
@@ -133,24 +155,25 @@ bool Database::add_att_div(QString table, QString new_att, QString att_1, QStrin
 //
 //***************************************************************************************************************************************************
 
-bool Database::add_att_prod(QString table, QString new_att, QString att_1, QString att_2){
+bool Database::add_att_prod(QString table, QString new_att, QString att_1, QString att_2, QString schemaName){
+    QString completeTableName = schemaName + "." + table;
 
     //AJOUT ATTRIBUT DANS VOIES
     QSqlQueryModel addAttribute;
-    addAttribute.setQuery(QString("ALTER TABLE %1 ADD %2 %3;").arg(table).arg(new_att).arg("double precision"));
+    addAttribute.setQuery(QString("ALTER TABLE %1 ADD %2 %3;").arg(completeTableName).arg(new_att).arg("double precision"));
 
     if (addAttribute.lastError().isValid()) {
-        emit fatal(QString("Impossible d'ajouter l'attribut %1 dans la table %2").arg(new_att).arg(table));
+        emit fatal(QString("Impossible d'ajouter l'attribut %1 dans la table %2").arg(new_att).arg(completeTableName));
         emit fatal(addAttribute.lastError().text());
         return false;
     }
 
     //CALCUL ET INSERTION DU NOUVEL ATTRIBUT
     QSqlQueryModel updateAttribute;
-    updateAttribute.setQuery(QString("UPDATE %1 SET %2=%3*%4;").arg(table).arg(new_att).arg(att_1).arg(att_2));
+    updateAttribute.setQuery(QString("UPDATE %1 SET %2=%3*%4;").arg(completeTableName).arg(new_att).arg(att_1).arg(att_2));
 
     if (updateAttribute.lastError().isValid()) {
-        emit fatal(QString("Impossible de calculer le nouvel attribut %1 dans %2 par multiplication").arg(new_att).arg(table));
+        emit fatal(QString("Impossible de calculer le nouvel attribut %1 dans %2 par multiplication").arg(new_att).arg(completeTableName));
         emit fatal(updateAttribute.lastError().text());
         return false;
     }
@@ -164,16 +187,17 @@ bool Database::add_att_prod(QString table, QString new_att, QString att_1, QStri
 //ajout d'un attribut combiné par soustraction
 //
 //***************************************************************************************************************************************************
-bool Database::add_att_dif(QString table, QString new_att, QString att_1, QString att_2){
+bool Database::add_att_dif(QString table, QString new_att, QString att_1, QString att_2, QString schemaName){
 
+    QString completeTableName = schemaName + "." + table;
 
-    if(! columnExists(table, new_att)){
+    if(! columnExists(table, new_att, schemaName)){
         //AJOUT ATTRIBUT DANS VOIES
         QSqlQueryModel addAttribute;
-        addAttribute.setQuery(QString("ALTER TABLE %1 ADD %2 %3 DEFAULT 0;").arg(table).arg(new_att).arg("double precision"));
+        addAttribute.setQuery(QString("ALTER TABLE %1 ADD %2 %3 DEFAULT 0;").arg(completeTableName).arg(new_att).arg("double precision"));
 
         if (addAttribute.lastError().isValid()) {
-            emit fatal(QString("Impossible d'ajouter l'attribut %1 dans la table %2").arg(new_att).arg(table));
+            emit fatal(QString("Impossible d'ajouter l'attribut %1 dans la table %2").arg(new_att).arg(completeTableName));
             emit fatal(addAttribute.lastError().text());
             return false;
         }
@@ -181,10 +205,10 @@ bool Database::add_att_dif(QString table, QString new_att, QString att_1, QStrin
 
     //CALCUL ET INSERTION DU NOUVEL ATTRIBUT
     QSqlQueryModel updateAttribute;
-    updateAttribute.setQuery(QString("UPDATE %1 SET %2=%3-%4;").arg(table).arg(new_att).arg(att_1).arg(att_2));
+    updateAttribute.setQuery(QString("UPDATE %1 SET %2=%3-%4;").arg(completeTableName).arg(new_att).arg(att_1).arg(att_2));
 
     if (updateAttribute.lastError().isValid()) {
-        emit fatal(QString("Impossible de calculer le nouvel attribut %1 dans %2 par division").arg(new_att).arg(table));
+        emit fatal(QString("Impossible de calculer le nouvel attribut %1 dans %2 par division").arg(new_att).arg(completeTableName));
         emit fatal(updateAttribute.lastError().text());
         return false;
     }
@@ -197,15 +221,16 @@ bool Database::add_att_dif(QString table, QString new_att, QString att_1, QStrin
 //ajout d'un attribut combiné par soustraction
 //
 //***************************************************************************************************************************************************
-bool Database::add_att_difABS(QString table, QString new_att, QString att_1, QString att_2){
+bool Database::add_att_difABS(QString table, QString new_att, QString att_1, QString att_2, QString schemaName){
+    QString completeTableName = schemaName + "." + table;
 
-    if(! columnExists(table, new_att)){
+    if(! columnExists(table, new_att, schemaName)){
         //AJOUT ATTRIBUT DANS VOIES
         QSqlQueryModel addAttribute;
-        addAttribute.setQuery(QString("ALTER TABLE %1 ADD %2 %3 DEFAULT 0;").arg(table).arg(new_att).arg("double precision"));
+        addAttribute.setQuery(QString("ALTER TABLE %1 ADD %2 %3 DEFAULT 0;").arg(completeTableName).arg(new_att).arg("double precision"));
 
         if (addAttribute.lastError().isValid()) {
-            emit fatal(QString("Impossible d'ajouter l'attribut %1 dans la table %2").arg(new_att).arg(table));
+            emit fatal(QString("Impossible d'ajouter l'attribut %1 dans la table %2").arg(new_att).arg(completeTableName));
             emit fatal(addAttribute.lastError().text());
             return false;
         }
@@ -213,10 +238,10 @@ bool Database::add_att_difABS(QString table, QString new_att, QString att_1, QSt
 
     //CALCUL ET INSERTION DU NOUVEL ATTRIBUT
     QSqlQueryModel updateAttribute;
-    updateAttribute.setQuery(QString("UPDATE %1 SET %2=abs(%3-%4);").arg(table).arg(new_att).arg(att_1).arg(att_2));
+    updateAttribute.setQuery(QString("UPDATE %1 SET %2=abs(%3-%4);").arg(completeTableName).arg(new_att).arg(att_1).arg(att_2));
 
     if (updateAttribute.lastError().isValid()) {
-        emit fatal(QString("Impossible de calculer le nouvel attribut %1 dans %2 par division").arg(new_att).arg(table));
+        emit fatal(QString("Impossible de calculer le nouvel attribut %1 dans %2 par division").arg(new_att).arg(completeTableName));
         emit fatal(updateAttribute.lastError().text());
         return false;
     }
@@ -230,24 +255,26 @@ bool Database::add_att_difABS(QString table, QString new_att, QString att_1, QSt
 //ajout d'un attribut combiné par addition
 //
 //***************************************************************************************************************************************************
-bool Database::add_att_add(QString table, QString new_att, QString att_1, QString att_2){
+bool Database::add_att_add(QString table, QString new_att, QString att_1, QString att_2, QString schemaName){
+
+    QString completeTableName = schemaName + "." + table;
 
     //AJOUT ATTRIBUT DANS VOIES
     QSqlQueryModel addAttribute;
-    addAttribute.setQuery(QString("ALTER TABLE %1 ADD %2 %3 DEFAULT 0;").arg(table).arg(new_att).arg("double precision"));
+    addAttribute.setQuery(QString("ALTER TABLE %1 ADD %2 %3 DEFAULT 0;").arg(completeTableName).arg(new_att).arg("double precision"));
 
     if (addAttribute.lastError().isValid()) {
-        emit fatal(QString("Impossible d'ajouter l'attribut %1 dans la table %2").arg(new_att).arg(table));
+        emit fatal(QString("Impossible d'ajouter l'attribut %1 dans la table %2").arg(new_att).arg(completeTableName));
         emit fatal(addAttribute.lastError().text());
         return false;
     }
 
     //CALCUL ET INSERTION DU NOUVEL ATTRIBUT
     QSqlQueryModel updateAttribute;
-    updateAttribute.setQuery(QString("UPDATE %1 SET %2=%3+%4;").arg(table).arg(new_att).arg(att_1).arg(att_2));
+    updateAttribute.setQuery(QString("UPDATE %1 SET %2=%3+%4;").arg(completeTableName).arg(new_att).arg(att_1).arg(att_2));
 
     if (updateAttribute.lastError().isValid()) {
-        emit fatal(QString("Impossible de calculer le nouvel attribut %1 dans %2 par division").arg(new_att).arg(table));
+        emit fatal(QString("Impossible de calculer le nouvel attribut %1 dans %2 par division").arg(new_att).arg(completeTableName));
         emit fatal(updateAttribute.lastError().text());
         return false;
     }
@@ -262,21 +289,23 @@ bool Database::add_att_add(QString table, QString new_att, QString att_1, QStrin
 //
 //***************************************************************************************************************************************************
 
-bool Database::add_att_cl(QString table, QString new_att, QString att_1, int nb_classes, bool ascendant){
+bool Database::add_att_cl(QString table, QString new_att, QString att_1, int nb_classes, bool ascendant, QString schemaName){
+
+    QString completeTableName = schemaName + "." + table;
 
     if (nb_classes == 0) {
         emit fatal("La classification ne peut pas se faire avec 0 classes");
         return false;
     }
 
-    if(! columnExists(table, new_att)){
+    if(! columnExists(table, new_att, schemaName)){
 
         //AJOUT ATTRIBUT DANS VOIES
         QSqlQueryModel addAttribute;
-        addAttribute.setQuery(QString("ALTER TABLE %1 ADD %2 integer;").arg(table).arg(new_att));
+        addAttribute.setQuery(QString("ALTER TABLE %1 ADD %2 integer;").arg(completeTableName).arg(new_att));
 
         if (addAttribute.lastError().isValid()) {
-            emit fatal(QString("Impossible d'ajouter l'attribut de classification par longueur %1 dans la table %2").arg(new_att).arg(table));
+            emit fatal(QString("Impossible d'ajouter l'attribut de classification par longueur %1 dans la table %2").arg(new_att).arg(completeTableName));
             emit fatal(addAttribute.lastError().text());
             return false;
         }
@@ -286,17 +315,17 @@ bool Database::add_att_cl(QString table, QString new_att, QString att_1, int nb_
 
     //longueur de voie par indice
     QSqlQueryModel queryLengthTot;
-    queryLengthTot.setQuery(QString("SELECT SUM(LENGTH) AS LENGTH_TOT FROM %1;").arg(table));
+    queryLengthTot.setQuery(QString("SELECT SUM(LENGTH) AS LENGTH_TOT FROM %1;").arg(completeTableName));
 
     if (queryLengthTot.lastError().isValid()) {
-        emit fatal(QString("Récupération de la somme totale des longueurs dans %1 : %2").arg(table).arg(queryLengthTot.lastError().text()));
+        emit fatal(QString("Récupération de la somme totale des longueurs dans %1 : %2").arg(completeTableName).arg(queryLengthTot.lastError().text()));
         return false;
     }
 
     float length_tot = queryLengthTot.record(0).value("LENGTH_TOT").toFloat();
     float length_autorisee = length_tot/nb_classes;
 
-    emit information(QString("Classification de %1 dans %2 : length_tot = %3 et length_autorisee = %4").arg(new_att).arg(table).arg(length_tot).arg(length_autorisee));
+    emit information(QString("Classification de %1 dans %2 : length_tot = %3 et length_autorisee = %4").arg(new_att).arg(completeTableName).arg(length_tot).arg(length_autorisee));
 
     QString idname;
     idname = "IDV";
@@ -315,11 +344,11 @@ bool Database::add_att_cl(QString table, QString new_att, QString att_1, int nb_
 
     //CLASSIFICATION
     QSqlQueryModel classification;
-    if (ascendant) classification.setQuery(QString("SELECT %1 AS ID, length AS LENGTH, %2 AS ATT FROM %3 WHERE %2 >= 0 ORDER BY ATT ASC;").arg(idname).arg(att_1).arg(table));
-    else classification.setQuery(QString("SELECT %1 AS ID, length AS LENGTH, %2 AS ATT FROM %3 WHERE %2 >= 0 ORDER BY ATT DESC;").arg(idname).arg(att_1).arg(table));
+    if (ascendant) classification.setQuery(QString("SELECT %1 AS ID, length AS LENGTH, %2 AS ATT FROM %3 WHERE %2 >= 0 ORDER BY ATT ASC;").arg(idname).arg(att_1).arg(completeTableName));
+    else classification.setQuery(QString("SELECT %1 AS ID, length AS LENGTH, %2 AS ATT FROM %3 WHERE %2 >= 0 ORDER BY ATT DESC;").arg(idname).arg(att_1).arg(completeTableName));
 
     if (classification.lastError().isValid()) {
-        emit fatal(QString("Impossible de recuperer les objets de la table %1, tries par %2").arg(table).arg(att_1));
+        emit fatal(QString("Impossible de recuperer les objets de la table %1, tries par %2").arg(completeTableName).arg(att_1));
         emit fatal(classification.lastError().text());
         return false;
     }
@@ -362,19 +391,19 @@ bool Database::add_att_cl(QString table, QString new_att, QString att_1, int nb_
 
         //INSERTION EN BASE
         QSqlQueryModel addClassification;
-        addClassification.setQuery(QString("UPDATE %1 SET %2 = %3 WHERE %4 = %5 ;").arg(table).arg(new_att).arg(current_category).arg(idname).arg(id));
+        addClassification.setQuery(QString("UPDATE %1 SET %2 = %3 WHERE %4 = %5 ;").arg(completeTableName).arg(new_att).arg(current_category).arg(idname).arg(id));
 
         if (addClassification.lastError().isValid()) {
-            emit fatal(QString("Impossible d'ajouter la valeur de classification %1 dans la table %2 pour l'identifiant %3").arg(new_att).arg(table).arg(id));
+            emit fatal(QString("Impossible d'ajouter la valeur de classification %1 dans la table %2 pour l'identifiant %3").arg(new_att).arg(completeTableName).arg(id));
             emit fatal(addClassification.lastError().text());
             return false;
         }
     }//end for e
 
     if (ascendant) {
-        emit information(QString("Classification de %1 dans %2 ordre ASC finie.").arg(new_att).arg(table));
+        emit information(QString("Classification de %1 dans %2 ordre ASC finie.").arg(new_att).arg(completeTableName));
     } else {
-        emit information(QString("Classification de %1 dans %2 ordre DESC finie.").arg(new_att).arg(table));
+        emit information(QString("Classification de %1 dans %2 ordre DESC finie.").arg(new_att).arg(completeTableName));
     }
 
     return true;

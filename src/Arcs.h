@@ -17,7 +17,7 @@ public:
     Arcs(Database* db, Logger* log, Graphe* graphe, Voies* voies, WayMethods::methodID methode, double seuil);
 
     //méthodes publiques
-    bool do_Arcs();
+    bool do_Arcs(QString inputSchemaName, QString inputTableName);
 
 private :
     //graphe auquel les voies sont rattachées
@@ -31,8 +31,12 @@ private :
     //nombre de rues
     int m_nbRues;
 
+
+    //nom du schéma de travail
+    QString m_schemaName;
+
     //méthodes privées
-    bool build_ARCS();
+    bool build_ARCS(QString inputSchemaName, QString inputTableName);
     bool build_RUES();
 
     Logger* pLogger;

@@ -22,13 +22,13 @@ bool Graphe::build_SXYZ(){
 
     //PRESENCE DE LA TABLE SXYZ ? SI DEJA EXISTANTE, rien à faire, sauf récupérer le nombre de sommets
 
-    if (! pDatabase->tableExists("SXYZ")) {
+    if (! pDatabase->tableExists("SXYZ", m_schemaName)) {
         pLogger->INFO("-------------------------- build_SXYZ START --------------------------");
 
         // CREATION DES TABLES SXYZ
 
         QSqlQueryModel createSXYZ;
-        createSXYZ.setQuery("CREATE TABLE SXYZ ( IDS SERIAL NOT NULL PRIMARY KEY, GEOM geometry, DEG integer);");
+        createSXYZ.setQuery("CREATE TABLE "+m_schemaName+".SXYZ ( IDS SERIAL NOT NULL PRIMARY KEY, GEOM geometry, DEG integer);");
 
         if (createSXYZ.lastError().isValid()) {
             pLogger->ERREUR(QString("createSXYZ : %1").arg(createSXYZ.lastError().text()));
@@ -40,7 +40,7 @@ bool Graphe::build_SXYZ(){
         pLogger->INFO("------------------------- SXYZ already exists ------------------------");
         // On récupère le nombre de sommets
         QSqlQueryModel nbSommets;
-        nbSommets.setQuery("SELECT COUNT(*) AS nb FROM SXYZ; ");
+        nbSommets.setQuery("SELECT COUNT(*) AS nb FROM "+m_schemaName+".SXYZ; ");
 
         if (nbSommets.lastError().isValid()) {
             pLogger->ERREUR(QString("Impossible de récupérer le nombre de sommets : %1").arg(nbSommets.lastError().text()));
@@ -69,8 +69,7 @@ int Graphe::ajouterSommet(QVariant point){
     double ids = m_nbSommets;
 
     QSqlQuery addSXYZ;
-    addSXYZ.prepare("INSERT INTO SXYZ (GEOM, DEG, IDS) "
-                    "VALUES (:GEOM, 1, :IDS);");
+    addSXYZ.prepare("INSERT INTO "+m_schemaName+".SXYZ (GEOM, DEG, IDS) VALUES (:GEOM, 1, :IDS);");
     addSXYZ.bindValue(":IDS",QVariant(ids));
     addSXYZ.bindValue(":GEOM",point);
 
@@ -98,7 +97,7 @@ int Graphe::ajouterSommet(QVariant point){
 int Graphe::find_ids(QVariant point){
 
     QSqlQuery  req_sxyz;
-    req_sxyz.prepare("SELECT IDS, DEG FROM SXYZ WHERE ST_Distance(GEOM, :POINT) < :E");
+    req_sxyz.prepare("SELECT IDS, DEG FROM "+m_schemaName+".SXYZ WHERE ST_Distance(GEOM, :POINT) < :E");
     req_sxyz.bindValue(":POINT", point);
     req_sxyz.bindValue(":E", m_toleranceSommets);
 
@@ -119,7 +118,7 @@ int Graphe::find_ids(QVariant point){
         }
 
         QSqlQuery updateDeg;
-        updateDeg.prepare("UPDATE SXYZ SET DEG=:DEG WHERE IDS=:IDS");
+        updateDeg.prepare("UPDATE "+m_schemaName+".SXYZ SET DEG=:DEG WHERE IDS=:IDS");
         updateDeg.bindValue(":IDS", req_sxyz_model.record(0).value("IDS").toInt());
         updateDeg.bindValue(":DEG", req_sxyz_model.record(0).value("DEG").toInt() + 1);
 
@@ -131,7 +130,7 @@ int Graphe::find_ids(QVariant point){
         return req_sxyz_model.record(0).value("IDS").toInt();
     } else if (req_sxyz_model.rowCount() == 1 ) {
         QSqlQuery updateDeg;
-        updateDeg.prepare("UPDATE SXYZ SET DEG=:DEG WHERE IDS=:IDS");
+        updateDeg.prepare("UPDATE "+m_schemaName+".SXYZ SET DEG=:DEG WHERE IDS=:IDS");
         updateDeg.bindValue(":IDS", req_sxyz_model.record(0).value("IDS").toInt());
         updateDeg.bindValue(":DEG", req_sxyz_model.record(0).value("DEG").toInt() + 1);
 
@@ -162,16 +161,16 @@ bool Graphe::build_SIF(QSqlQueryModel* arcs_bruts){
 
     //PRESENCE DE LA TABLE SIF ? SI DEJA EXISTANTE, rien à faire
 
-    if (! pDatabase->tableExists("SIF")) {
+    if (! pDatabase->tableExists("SIF", m_schemaName)) {
 
         pLogger->INFO("--------------------------- build_SIF START --------------------------");
 
         //CREATION DE LA TABLE SIF D'ACCUEIL DEFINITIVE
 
         QSqlQueryModel createTableSIF;
-        createTableSIF.setQuery("CREATE TABLE SIF ( IDA SERIAL NOT NULL PRIMARY KEY, SI bigint, SF bigint, GEOM geometry, IDV integer, STRUCT float, AZIMUTH_I double precision, AZIMUTH_F double precision, "
-                                "FOREIGN KEY (SI) REFERENCES SXYZ(IDS), "
-                                "FOREIGN KEY (SF) REFERENCES SXYZ(IDS) );");
+        createTableSIF.setQuery("CREATE TABLE "+m_schemaName+".SIF ( IDA SERIAL NOT NULL PRIMARY KEY, SI bigint, SF bigint, GEOM geometry, IDV integer, STRUCT float, AZIMUTH_I double precision, AZIMUTH_F double precision, "
+                                "FOREIGN KEY (SI) REFERENCES "+m_schemaName+".SXYZ(IDS), "
+                                "FOREIGN KEY (SF) REFERENCES "+m_schemaName+".SXYZ(IDS) );");
 
         if (createTableSIF.lastError().isValid()) {
             pLogger->ERREUR(QString("createtable_sif : %1").arg(createTableSIF.lastError().text()));
@@ -196,7 +195,7 @@ bool Graphe::build_SIF(QSqlQueryModel* arcs_bruts){
 
             //SAUVEGARDE EN BASE
             QSqlQuery addInSIF;
-            addInSIF.prepare("INSERT INTO SIF(IDA, SI, SF, AZIMUTH_I, AZIMUTH_F, GEOM) VALUES (:IDA, :SI, :SF, :AI, :AF, :GEOM);");
+            addInSIF.prepare("INSERT INTO "+m_schemaName+".SIF(IDA, SI, SF, AZIMUTH_I, AZIMUTH_F, GEOM) VALUES (:IDA, :SI, :SF, :AI, :AF, :GEOM);");
             addInSIF.bindValue(":IDA",QVariant(ida));
             addInSIF.bindValue(":SI",QVariant(id_si));
             addInSIF.bindValue(":SF",QVariant(id_sf));
@@ -220,7 +219,7 @@ bool Graphe::build_SIF(QSqlQueryModel* arcs_bruts){
 
 
     QSqlQueryModel nbImpasses;
-    nbImpasses.setQuery("SELECT COUNT(*) AS nb FROM SXYZ WHERE DEG=1; ");
+    nbImpasses.setQuery("SELECT COUNT(*) AS nb FROM "+m_schemaName+".SXYZ WHERE DEG=1; ");
 
     if (nbImpasses.lastError().isValid()) {
         pLogger->ERREUR(QString("Impossible de récupérer le nombre d'impasses : %1").arg(nbImpasses.lastError().text()));
@@ -232,7 +231,7 @@ bool Graphe::build_SIF(QSqlQueryModel* arcs_bruts){
 
 
     QSqlQueryModel nbIntersections;
-    nbIntersections.setQuery("SELECT COUNT(*) AS nb FROM SXYZ WHERE DEG>1; ");
+    nbIntersections.setQuery("SELECT COUNT(*) AS nb FROM "+m_schemaName+".SXYZ WHERE DEG>1; ");
 
     if (nbIntersections.lastError().isValid()) {
         pLogger->ERREUR(QString("Impossible de récupérer le nombre d'intersections : %1").arg(nbIntersections.lastError().text()));
@@ -244,7 +243,7 @@ bool Graphe::build_SIF(QSqlQueryModel* arcs_bruts){
 
 
     QSqlQueryModel nbSommetsNul;
-    nbSommetsNul.setQuery("SELECT COUNT(*) AS nb FROM SXYZ WHERE DEG=0; ");
+    nbSommetsNul.setQuery("SELECT COUNT(*) AS nb FROM "+m_schemaName+".SXYZ WHERE DEG=0; ");
 
     if (nbSommetsNul.lastError().isValid()) {
         pLogger->ERREUR(QString("Impossible de récupérer le nombre de sommets isolés : %1").arg(nbSommetsNul.lastError().text()));
@@ -276,13 +275,13 @@ bool Graphe::build_SIF(QSqlQueryModel* arcs_bruts){
 bool Graphe::build_ANGLES(){
 
 
-    if (! pDatabase->tableExists("ANGLES")) {
+    if (! pDatabase->tableExists("ANGLES", m_schemaName)) {
 
         pLogger->INFO("-------------------------- build_ANGLES START ------------------------");
 
         QSqlQueryModel createTableANGLES;
-        createTableANGLES.setQuery("CREATE TABLE ANGLES (ID SERIAL NOT NULL PRIMARY KEY, IDS bigint, IDA1 bigint, IDA2 bigint, ANGLE float, USED boolean, "
-                                "FOREIGN KEY (IDS) REFERENCES SXYZ(IDS), FOREIGN KEY (IDA1) REFERENCES SIF(IDA), FOREIGN KEY (IDA2) REFERENCES SIF(IDA) );");
+        createTableANGLES.setQuery("CREATE TABLE "+m_schemaName+".ANGLES (ID SERIAL NOT NULL PRIMARY KEY, IDS bigint, IDA1 bigint, IDA2 bigint, ANGLE float, USED boolean, "
+                                "FOREIGN KEY (IDS) REFERENCES "+m_schemaName+".SXYZ(IDS), FOREIGN KEY (IDA1) REFERENCES "+m_schemaName+".SIF(IDA), FOREIGN KEY (IDA2) REFERENCES "+m_schemaName+".SIF(IDA) );");
 
         if (createTableANGLES.lastError().isValid()) {
             pLogger->ERREUR(QString("createTableANGLES : %1").arg(createTableANGLES.lastError().text()));
@@ -291,11 +290,11 @@ bool Graphe::build_ANGLES(){
 
         QSqlQueryModel* modelArcs = new QSqlQueryModel();
         QSqlQuery queryArcs;
-        queryArcs.prepare("SELECT IDA AS IDA, SI AS SI, SF AS SF, AZIMUTH_I AS AI, AZIMUTH_F AS AF FROM SIF WHERE SI = :IDSI OR SF = :IDSF;");
+        queryArcs.prepare("SELECT IDA AS IDA, SI AS SI, SF AS SF, AZIMUTH_I AS AI, AZIMUTH_F AS AF FROM "+m_schemaName+".SIF WHERE SI = :IDSI OR SF = :IDSF;");
 
 
         QSqlQuery addAngle;
-        addAngle.prepare("INSERT INTO ANGLES(IDS, IDA1, IDA2, ANGLE, USED) VALUES (:IDS, :IDA1, :IDA2, :ANGLE, FALSE);");
+        addAngle.prepare("INSERT INTO "+m_schemaName+".ANGLES(IDS, IDA1, IDA2, ANGLE, USED) VALUES (:IDS, :IDA1, :IDA2, :ANGLE, FALSE);");
 
         for (int s = 1; s <= m_nbSommets; s++) {
             queryArcs.bindValue(":IDSI",s);
@@ -431,7 +430,7 @@ bool Graphe::build_SomArcs(){
 
     //REQUETE SUR SIF
     QSqlQueryModel *tableSIF = new QSqlQueryModel();
-    tableSIF->setQuery("SELECT ida AS IDA, si AS SI, sf AS SF FROM SIF;");
+    tableSIF->setQuery("SELECT ida AS IDA, si AS SI, sf AS SF FROM "+m_schemaName+".SIF;");
 
     if (tableSIF->lastError().isValid()) {
         pLogger->ERREUR(QString("tableSIF : %1").arg(tableSIF->lastError().text()));
@@ -460,7 +459,7 @@ bool Graphe::build_SomArcs(){
 
 
     QSqlQuery addDegresInSXYZ;
-    addDegresInSXYZ.prepare("UPDATE SXYZ SET DEG = :DEG WHERE ids = :IDS ;");
+    addDegresInSXYZ.prepare("UPDATE "+m_schemaName+".SXYZ SET DEG = :DEG WHERE ids = :IDS ;");
     for(int s=1; s <= m_nbSommets; s++){
 
         int degres = m_SomArcs[s].size();
@@ -528,9 +527,9 @@ bool Graphe::insertINFO(){
 
     pLogger->INFO("-------------------------- insertINFO START --------------------------");
 
-    if (! pDatabase->tableExists("INFO")) {
+    if (! pDatabase->tableExists("INFO", m_schemaName)) {
         QSqlQueryModel createTableINFO;
-        createTableINFO.setQuery("CREATE TABLE INFO ( "
+        createTableINFO.setQuery("CREATE TABLE "+m_schemaName+".INFO ( "
                                   "ID SERIAL NOT NULL PRIMARY KEY, "
                                   "methode integer, "
                                   "seuil_angle integer, "
@@ -594,7 +593,7 @@ bool Graphe::insertINFO(){
         }
 
         QSqlQuery addInfos;
-        addInfos.prepare("INSERT INTO INFO (NS, NA, NPA, N_INTER, N_IMP, ACTIVE) VALUES (:NS, :NA, :NPA, :N_INTER, :N_IMP, FALSE);");
+        addInfos.prepare("INSERT INTO "+m_schemaName+".INFO (NS, NA, NPA, N_INTER, N_IMP, ACTIVE) VALUES (:NS, :NA, :NPA, :N_INTER, :N_IMP, FALSE);");
         addInfos.bindValue(":NS",QVariant(m_nbSommets));
         addInfos.bindValue(":NA",QVariant(m_nbArcs));
         addInfos.bindValue(":NPA",QVariant(m_nbPointsAnnexes));
@@ -625,7 +624,7 @@ bool Graphe::do_Graphe(QString brutArcsTableName){
 
     //construction des tables en BDD
     if (! build_SXYZ()) {
-        if (! pDatabase->dropTable("SXYZ")) {
+        if (! pDatabase->dropTable("SXYZ", m_schemaName)) {
             pLogger->ERREUR("build_SXYZ en erreur, ROLLBACK (drop SXYZ) échoué");
         } else {
             pLogger->INFO("build_SXYZ en erreur, ROLLBACK (drop SXYZ) réussi");
@@ -661,12 +660,12 @@ bool Graphe::do_Graphe(QString brutArcsTableName){
     pLogger->INFO(QString("Nombre d'arcs : %1").arg(m_nbArcs));
 
     if (! build_SIF(arcs_bruts)) {
-        if (! pDatabase->dropTable("SIF")) {
+        if (! pDatabase->dropTable("SIF", m_schemaName)) {
             pLogger->ERREUR("build_SIF en erreur, ROLLBACK (drop SIF) échoué");
         } else {
             pLogger->INFO("build_SIF en erreur, ROLLBACK (drop SIF) réussi");
         }
-        if (! pDatabase->dropTable("SXYZ")) {
+        if (! pDatabase->dropTable("SXYZ", m_schemaName)) {
             pLogger->ERREUR("build_SIF en erreur, ROLLBACK (drop SXYZ) échoué");
         } else {
             pLogger->INFO("build_SIF en erreur, ROLLBACK (drop SXYZ) réussi");
@@ -681,7 +680,7 @@ bool Graphe::do_Graphe(QString brutArcsTableName){
     if (! build_ArcArcs()) return false;
 
     if (! build_ANGLES()) {
-        if (! pDatabase->dropTable("ANGLES")) {
+        if (! pDatabase->dropTable("ANGLES", m_schemaName)) {
             pLogger->ERREUR("build_ANGLES en erreur, ROLLBACK (drop ANGLES) échoué");
         } else {
             pLogger->INFO("build_ANGLES en erreur, ROLLBACK (drop ANGLES) réussi");
@@ -699,7 +698,7 @@ bool Graphe::do_Graphe(QString brutArcsTableName){
 
 bool Graphe::getSommetsOfArcs(int ida, int* si, int* sf) {
     QSqlQuery queryArc;
-    queryArc.prepare("SELECT SI, SF FROM SIF WHERE IDA = :IDA;");
+    queryArc.prepare("SELECT SI, SF FROM "+m_schemaName+".SIF WHERE IDA = :IDA;");
 
     queryArc.bindValue(":IDA",ida);
 
@@ -718,7 +717,7 @@ bool Graphe::getSommetsOfArcs(int ida, int* si, int* sf) {
 
 float Graphe::getAngle(int ids, int ida1, int ida2) {
     QSqlQuery queryAngle;
-    queryAngle.prepare("SELECT ANGLE FROM ANGLES WHERE (IDS = :IDS) AND ((IDA1 = :IDARC11 AND IDA2 = :IDARC21)  OR (IDA2 = :IDARC12 AND IDA1 = :IDARC22));");
+    queryAngle.prepare("SELECT ANGLE FROM "+m_schemaName+".ANGLES WHERE (IDS = :IDS) AND ((IDA1 = :IDARC11 AND IDA2 = :IDARC21)  OR (IDA2 = :IDARC12 AND IDA1 = :IDARC22));");
 
     queryAngle.bindValue(":IDARC11",ida1);
     queryAngle.bindValue(":IDARC21",ida2);
@@ -769,7 +768,7 @@ float Graphe::getAngle(int ids, int ida1, int ida2) {
 
 bool Graphe::checkAngle(int ids, int ida1, int ida2) {
     QSqlQuery queryAngle;
-    queryAngle.prepare("UPDATE ANGLES SET USED=TRUE WHERE (IDS = :IDS) AND ((IDA1 = :IDARC11 AND IDA2 = :IDARC21) OR (IDA2 = :IDARC12 AND IDA1 = :IDARC22));");
+    queryAngle.prepare("UPDATE "+m_schemaName+".ANGLES SET USED=TRUE WHERE (IDS = :IDS) AND ((IDA1 = :IDARC11 AND IDA2 = :IDARC21) OR (IDA2 = :IDARC12 AND IDA1 = :IDARC22));");
 
     queryAngle.bindValue(":IDARC11",ida1);
     queryAngle.bindValue(":IDARC21",ida2);

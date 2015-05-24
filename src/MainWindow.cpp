@@ -87,64 +87,91 @@ void MainWindow::calculate() {
     double seuil_angle = ui->thresholdDoubleSpinBox->value();
     //+++
 
+    //------------------------------- Sources et destinations
+
+    QString inputSchema = ui->arcsschemanameLineEdit->text();
+    if (inputSchema.isEmpty() || inputSchema.isNull()) {
+        inputSchema = "public";
+    }
+    QString inputTable = ui->arcstablenameLineEdit->text();
+
+    QString completeInputTableName = inputSchema+"."+inputTable;
+
+
+    QString outputDirectory = ui->directoryLineEdit->text();
+    QString outputSchema = ui->schemaLineEdit->text();
+    if (outputSchema.isEmpty() || outputSchema.isNull()) {
+        outputSchema = "public";
+    }
+
+    if (! pDatabase->schemaExists(outputSchema)) {
+        QSqlQueryModel createSchema;
+        createSchema.setQuery("CREATE SCHEMA "+outputSchema+";");
+
+        if (createSchema.lastError().isValid()) {
+            mettreEnErreur("Impossible de créer le schéma de destination : "+createSchema.lastError().text());
+            return;
+        }
+    }
+
  //   for(seuil_angle = 148.; seuil_angle<=180; seuil_angle+=2){
 
     if (ui->dropTABLESCheckBox->isChecked()){
-        pDatabase->dropTable("SXYZ");
-        pDatabase->dropTable("SIF");
-        pDatabase->dropTable("ANGLES");
-        pDatabase->dropTable("INFO");
-        pDatabase->dropTable("VOIES");
+        pDatabase->dropTable("SXYZ",outputSchema);
+        pDatabase->dropTable("SIF",outputSchema);
+        pDatabase->dropTable("ANGLES",outputSchema);
+        pDatabase->dropTable("INFO",outputSchema);
+        pDatabase->dropTable("VOIES",outputSchema);
         pLogger->INFO("table VOIES has been droped");
     }
 
-        //------------------------------- Création du graphe
-        Graphe *graphe_courant = new Graphe(pDatabase, pLogger, ui->BufferDoubleSpinBox->value());
+    //------------------------------- Création du graphe
+    Graphe *graphe_courant = new Graphe(pDatabase, pLogger, outputSchema, ui->BufferDoubleSpinBox->value());
 
-        ui->statusBar->showMessage("Graph in progress");
-        QApplication::processEvents();
-        if (! graphe_courant->do_Graphe(ui->arcstablenameLineEdit->text())) {
-            mettreEnErreur("Cannot calculate graph");
-            return;
-        }
+    ui->statusBar->showMessage("Graph in progress");
+    QApplication::processEvents();
+    if (! graphe_courant->do_Graphe(completeInputTableName)) {
+        mettreEnErreur("Cannot calculate graph");
+        return;
+    }
 
-        //------------------------------- Calculs sur les voies
-        Voies *voies_courantes = new Voies(pDatabase, pLogger, graphe_courant, methode, seuil_angle, ui->arcstablenameLineEdit->text(), ui->directoryLineEdit->text());
-        pLogger->INFO("voies creees");
-
-
-        ui->statusBar->showMessage("Ways in progress");
-        QApplication::processEvents();
-        if (! voies_courantes->do_Voies()) {
-            mettreEnErreur("Cannot calculate ways");
-            return;
-        }
-
-        ui->statusBar->showMessage("Ways' attributes in progress");
-        QApplication::processEvents();
-        if (! voies_courantes->do_Att_Voie(ui->connexionCheckBox->isChecked(), ui->useCheckBox->isChecked(), ui->inclusionCheckBox->isChecked(), ui->gradientCheckBox->isChecked(), ui->localAccesscheckBox->isChecked())) {
-            mettreEnErreur("Cannot calculate ways' attributes");
-            return;
-        }
-
-        ui->statusBar->showMessage("Edges' attributes in progress");
-        QApplication::processEvents();
-        if (! voies_courantes->do_Att_Arc()) {
-            mettreEnErreur("Cannot calculate edges' attributes");
-            return;
-        }
+    //------------------------------- Calculs sur les voies
+    Voies *voies_courantes = new Voies(pDatabase, pLogger, graphe_courant, methode, seuil_angle, completeInputTableName, outputDirectory);
+    pLogger->INFO("voies creees");
 
 
-        //------------------------------- Calculs sur les arcs
-        Arcs *arcs_courants = new Arcs(pDatabase, pLogger, graphe_courant, voies_courantes, methode, seuil_angle);
-        pLogger->INFO("arcs creees");
+    ui->statusBar->showMessage("Ways in progress");
+    QApplication::processEvents();
+    if (! voies_courantes->do_Voies()) {
+        mettreEnErreur("Cannot calculate ways");
+        return;
+    }
 
-        ui->statusBar->showMessage("Arcs in progress");
-        QApplication::processEvents();
-        if (ui->arcRueCheckBox->isChecked() && ! arcs_courants->do_Arcs()) {
-            mettreEnErreur("Cannot calculate arcs");
-            return;
-        }
+    ui->statusBar->showMessage("Ways' attributes in progress");
+    QApplication::processEvents();
+    if (! voies_courantes->do_Att_Voie(ui->connexionCheckBox->isChecked(), ui->useCheckBox->isChecked(), ui->inclusionCheckBox->isChecked(), ui->gradientCheckBox->isChecked(), ui->localAccesscheckBox->isChecked())) {
+        mettreEnErreur("Cannot calculate ways' attributes");
+        return;
+    }
+
+    ui->statusBar->showMessage("Edges' attributes in progress");
+    QApplication::processEvents();
+    if (! voies_courantes->do_Att_Arc()) {
+        mettreEnErreur("Cannot calculate edges' attributes");
+        return;
+    }
+
+
+    //------------------------------- Calculs sur les arcs
+    Arcs *arcs_courants = new Arcs(pDatabase, pLogger, graphe_courant, voies_courantes, methode, seuil_angle);
+    pLogger->INFO("arcs creees");
+
+    ui->statusBar->showMessage("Arcs in progress");
+    QApplication::processEvents();
+    if (ui->arcRueCheckBox->isChecked() && ! arcs_courants->do_Arcs(inputSchema, inputTable)) {
+        mettreEnErreur("Cannot calculate arcs");
+        return;
+    }
 
  //   }//end for seuil
 
@@ -193,49 +220,55 @@ void MainWindow::modify() {
     QDateTime start = QDateTime::currentDateTime();
     pLogger->INFO(QString("Started : %1").arg(start.toString()));
 
-    QString table = ui->arcstablenameLineEdit->text();
+    QString inputSchema = ui->arcsschemanameLineEdit->text();
+    if (inputSchema.isEmpty() || inputSchema.isNull()) {
+        inputSchema = "public";
+    }
+    QString inputTable = ui->arcstablenameLineEdit->text();
+
+
     QString att_1 = ui->inputatt1LineEdit->text();
     QString new_att1 = ui->resultattLineEdit->text();
 
     if (ui->classificationRadioButton->isChecked()) {
         int nb_classes = ui->classnbSpinBox->value();
         bool ascendant = ! ui->descentCheckBox->isChecked();
-        if (! pDatabase->add_att_cl(table, new_att1, att_1, nb_classes, ascendant)) {
+        if (! pDatabase->add_att_cl(inputTable, new_att1, att_1, nb_classes, ascendant, inputSchema)) {
             mettreEnErreur("Erreur classification");
             return;
         }
 
     } else if (ui->additionRadioButton->isChecked()) {
         QString att_2 = ui->inputatt2LineEdit->text();
-        if (! pDatabase->add_att_add(table, new_att1, att_1, att_2)) {
+        if (! pDatabase->add_att_add(inputTable, new_att1, att_1, att_2, inputSchema)) {
             mettreEnErreur("Erreur addition");
             return;
         }
 
     } else if (ui->soustractionRadioButton->isChecked()) {
         QString att_2 = ui->inputatt2LineEdit->text();
-        if (! pDatabase->add_att_dif(table, new_att1, att_1, att_2)) {
+        if (! pDatabase->add_att_dif(inputTable, new_att1, att_1, att_2, inputSchema)) {
             mettreEnErreur("Erreur soustraction");
             return;
         }
 
     } else if (ui->multiplicationRadioButton->isChecked()) {
         QString att_2 = ui->inputatt2LineEdit->text();
-        if (! pDatabase->add_att_prod(table, new_att1, att_1, att_2)) {
+        if (! pDatabase->add_att_prod(inputTable, new_att1, att_1, att_2, inputSchema)) {
             mettreEnErreur("Erreur multiplication");
             return;
         }
 
     } else if (ui->divisionRadioButton->isChecked()) {
         QString att_2 = ui->inputatt2LineEdit->text();
-        if (! pDatabase->add_att_div(table, new_att1, att_1, att_2)) {
+        if (! pDatabase->add_att_div(inputTable, new_att1, att_1, att_2, inputSchema)) {
             mettreEnErreur("Erreur division");
             return;
         }
 
     } else if (ui->absoluteDiffRadioButton->isChecked()) {
         QString att_2 = ui->inputatt2LineEdit->text();
-        if (! pDatabase->add_att_difABS(table, new_att1, att_1, att_2)) {
+        if (! pDatabase->add_att_difABS(inputTable, new_att1, att_1, att_2, inputSchema)) {
             mettreEnErreur("Erreur différence absolue");
             return;
         }

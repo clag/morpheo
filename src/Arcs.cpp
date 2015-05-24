@@ -11,6 +11,7 @@ Arcs::Arcs(Database* db, Logger* log, Graphe* graphe, Voies* voies, WayMethods::
     pLogger->INFO(QString("Methode de contruction des voies : %1").arg(WayMethods::MethodeVoies_name[methode]));
 
     m_Graphe = graphe;
+    m_schemaName = graphe->getSchemaName();
     m_Voies = voies;
     m_seuil_angle = seuil;
     m_methode = methode;
@@ -21,25 +22,27 @@ Arcs::Arcs(Database* db, Logger* log, Graphe* graphe, Voies* voies, WayMethods::
 //
 //***************************************************************************************************************************************************
 
-bool Arcs::build_ARCS(){
+bool Arcs::build_ARCS(QString inputSchemaName, QString inputTableName){
+
+    QString completeInputName = inputSchemaName + "." + inputTableName;
 
     //SUPPRESSION DE LA TABLE ARCS SI DEJA EXISTANTE
-    if (! pDatabase->tableExists("ARCS")) {
+    if (! pDatabase->tableExists("ARCS", m_schemaName)) {
 
         pLogger->INFO("-------------------------- build_ARCS START ------------------------");
 
         //CREATION DE LA TABLE ARCS
 
         QString column_nom;
-        if (pDatabase->columnExists("brut_arcs", "nom_voie_g")){column_nom =  "nom_voie_g";}
-        else if (pDatabase->columnExists("brut_arcs", "nom_rue_g")){column_nom =  "nom_rue_g";}
+        if (pDatabase->columnExists(inputTableName, "nom_voie_g", inputSchemaName)){column_nom =  "nom_voie_g";}
+        else if (pDatabase->columnExists(inputTableName, "nom_rue_g", inputSchemaName)){column_nom =  "nom_rue_g";}
         else {
             pLogger->ERREUR(QString("Impossible de trouver la colonne de noms."));
             return false;
         }
 
         QSqlQueryModel createTableARCS;
-        createTableARCS.setQuery(QString("CREATE TABLE ARCS AS SELECT GID AS IDA, %1 AS NOM, GEOM FROM brut_arcs;").arg(column_nom));
+        createTableARCS.setQuery(QString("CREATE TABLE "+m_schemaName+".ARCS AS SELECT GID AS IDA, %1 AS NOM, GEOM FROM "+completeInputName+";").arg(column_nom));
 
         if (createTableARCS.lastError().isValid()) {
             pLogger->ERREUR(QString("createTableARCS : %1").arg(createTableARCS.lastError().text()));
@@ -49,7 +52,7 @@ bool Arcs::build_ARCS(){
         //AJOUT DE L'ATTRIBUT IDV
 
         QSqlQueryModel addIdvInARCS;
-        addIdvInARCS.setQuery("ALTER TABLE ARCS ADD IDV integer;");
+        addIdvInARCS.setQuery("ALTER TABLE "+m_schemaName+".ARCS ADD IDV integer;");
 
         if (addIdvInARCS.lastError().isValid()) {
             pLogger->ERREUR(QString("Impossible d'ajouter l'attribut idv dans ARCS : %1").arg(addIdvInARCS.lastError().text()));
@@ -60,7 +63,7 @@ bool Arcs::build_ARCS(){
 
         QSqlQueryModel *geomFromARCS = new QSqlQueryModel();
 
-        geomFromARCS->setQuery("SELECT IDA, GEOM FROM ARCS;");
+        geomFromARCS->setQuery("SELECT IDA, GEOM FROM "+m_schemaName+".ARCS;");
 
         if (geomFromARCS->lastError().isValid()) {
             pLogger->ERREUR(QString("Impossible de recuperer la géométries dans ARCS : %1").arg(geomFromARCS->lastError().text()));
@@ -76,7 +79,7 @@ bool Arcs::build_ARCS(){
 
             QSqlQueryModel *idvFromVOIES = new QSqlQueryModel();
 
-            idvFromVOIES->setQuery(QString("SELECT IDV FROM VOIES WHERE ST_Covers(MULTIGEOM,'%1');").arg(geom_a));
+            idvFromVOIES->setQuery(QString("SELECT IDV FROM "+m_schemaName+".VOIES WHERE ST_Covers(MULTIGEOM,'%1');").arg(geom_a));
 
             if (idvFromVOIES->lastError().isValid()) {
                 pLogger->ERREUR(QString("Impossible de recuperer l'idv dans VOIES : %1").arg(idvFromVOIES->lastError().text()));
@@ -98,7 +101,7 @@ bool Arcs::build_ARCS(){
 
             //INSERTION EN BASE
             QSqlQuery addIdvAttInARCS;
-            addIdvAttInARCS.prepare("UPDATE ARCS SET IDV = :IDV WHERE ida = :IDA ;");
+            addIdvAttInARCS.prepare("UPDATE "+m_schemaName+".ARCS SET IDV = :IDV WHERE ida = :IDA ;");
             addIdvAttInARCS.bindValue(":IDA",ida );
             addIdvAttInARCS.bindValue(":IDV",idv);
 
@@ -129,14 +132,14 @@ bool Arcs::build_ARCS(){
 bool Arcs::build_RUES(){
 
     //SUPPRESSION DE LA TABLE RUES SI DEJA EXISTANTE
-    if (! pDatabase->tableExists("RUES")) {
+    if (! pDatabase->tableExists("RUES", m_schemaName)) {
 
         pLogger->INFO("-------------------------- build_RUES START ------------------------");
 
         //CREATION DE LA TABLE RUES
 
         QSqlQueryModel createTableRUES;
-        createTableRUES.setQuery("CREATE TABLE RUES (IDR SERIAL NOT NULL PRIMARY KEY, NOM VARCHAR(140), MULTIGEOM geometry);");
+        createTableRUES.setQuery("CREATE TABLE "+m_schemaName+".RUES (IDR SERIAL NOT NULL PRIMARY KEY, NOM VARCHAR(140), MULTIGEOM geometry);");
 
         if (createTableRUES.lastError().isValid()) {
             pLogger->ERREUR(QString("createTableRUES : %1").arg(createTableRUES.lastError().text()));
@@ -146,7 +149,7 @@ bool Arcs::build_RUES(){
         // RECHERCHE DU NOMBRE DE RUES
 
         QSqlQueryModel countRues;
-        countRues.setQuery("SELECT COUNT(IDA) AS COMPTE FROM (SELECT DISTINCT(NOM), IDA FROM ARCS WHERE NOM != '')  AS NOMS;");
+        countRues.setQuery("SELECT COUNT(IDA) AS COMPTE FROM (SELECT DISTINCT(NOM), IDA FROM "+m_schemaName+".ARCS WHERE NOM != '')  AS NOMS;");
 
         if (countRues.lastError().isValid()) {
             pLogger->ERREUR(QString("Impossible de compter les rues : %1").arg(countRues.lastError().text()));
@@ -162,7 +165,7 @@ bool Arcs::build_RUES(){
 
         QSqlQueryModel *nomFromARCS = new QSqlQueryModel();
 
-        nomFromARCS->setQuery("SELECT DISTINCT(NOM) FROM ARCS WHERE NOM != '';");
+        nomFromARCS->setQuery("SELECT DISTINCT(NOM) FROM "+m_schemaName+".ARCS WHERE NOM != '';");
 
         if (nomFromARCS->lastError().isValid()) {
             pLogger->ERREUR(QString("Impossible de recuperer le nom dans ARCS : %1").arg(nomFromARCS->lastError().text()));
@@ -180,7 +183,7 @@ bool Arcs::build_RUES(){
 
             QSqlQueryModel *geomFromARCS = new QSqlQueryModel();
 
-            geomFromARCS->setQuery(QString("SELECT GEOM FROM ARCS WHERE NOM = '%1';").arg(nom));
+            geomFromARCS->setQuery(QString("SELECT GEOM FROM "+m_schemaName+".ARCS WHERE NOM = '%1';").arg(nom));
 
             //pLogger->INFO(QString("requête envoyée : %1").arg(geomFromARCS->query().lastQuery()));
 
@@ -222,7 +225,7 @@ bool Arcs::build_RUES(){
 
                 delete geomFromARCS;
 
-                QString addRue = QString("INSERT INTO RUES (IDR, NOM, MULTIGEOM) VALUES (%1 , '%2', '%3');").arg(n).arg(nom).arg(geom1);
+                QString addRue = QString("INSERT INTO "+m_schemaName+".RUES (IDR, NOM, MULTIGEOM) VALUES (%1 , '%2', '%3');").arg(n).arg(nom).arg(geom1);
                 QSqlQuery addInRUES;
                 addInRUES.prepare(addRue);
 
@@ -256,11 +259,11 @@ bool Arcs::build_RUES(){
 //
 //***************************************************************************************************************************************************
 
-bool Arcs::do_Arcs(){
+bool Arcs::do_Arcs(QString inputSchemaName, QString inputTableName){
 
     // Construction de la table ARCS en BDD
-    if (! build_ARCS()) {
-        if (! pDatabase->dropTable("ARCS")) {
+    if (! build_ARCS(inputSchemaName, inputTableName)) {
+        if (! pDatabase->dropTable("ARCS", m_schemaName)) {
             pLogger->ERREUR("build_ARCS en erreur, ROLLBACK (drop ARCS) echoue");
         } else {
             pLogger->INFO("build_ARCS en erreur, ROLLBACK (drop ARCS) reussi");
@@ -270,7 +273,7 @@ bool Arcs::do_Arcs(){
 
     // Construction de la table RUES en BDD
     if (! build_RUES()) {
-        if (! pDatabase->dropTable("RUES")) {
+        if (! pDatabase->dropTable("RUES", m_schemaName)) {
             pLogger->ERREUR("build_RUES en erreur, ROLLBACK (drop RUES) echoue");
         } else {
             pLogger->INFO("build_RUES en erreur, ROLLBACK (drop RUES) reussi");

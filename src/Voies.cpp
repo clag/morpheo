@@ -28,6 +28,7 @@ Voies::Voies(Database* db, Logger* log, Graphe* graphe, WayMethods::methodID met
 
     m_Graphe = graphe;
     m_rawTableName = rawTableName;
+    m_schemaName = graphe->getSchemaName();
     m_directory = directory;
     m_seuil_angle = seuil;
     m_methode = methode;
@@ -63,7 +64,7 @@ bool Voies::findCouplesAngleMin(int ids)
 
     QSqlQueryModel modelAngles;
     QSqlQuery queryAngles;
-    queryAngles.prepare("SELECT IDA1, IDA2, ANGLE FROM ANGLES WHERE IDS = :IDS ORDER BY ANGLE ASC;");
+    queryAngles.prepare("SELECT IDA1, IDA2, ANGLE FROM "+m_schemaName+".ANGLES WHERE IDS = :IDS ORDER BY ANGLE ASC;");
     queryAngles.bindValue(":IDS",ids);
 
     if (! queryAngles.exec()) {
@@ -375,7 +376,7 @@ bool Voies::buildCouples(){
 
     pLogger->INFO("------------------------- buildCouples START -------------------------");
 
-    QString degreefilename=QString("%1/degree_%2_%3.txt").arg(m_directory).arg(QSqlDatabase::database().databaseName()).arg(m_rawTableName);
+    QString degreefilename=QString("%1/degree_%2_%3.txt").arg(m_directory).arg(QSqlDatabase::database().databaseName()).arg(m_schemaName);
     QFile degreeqfile( degreefilename );
     if (! degreeqfile.open(QIODevice::ReadWrite) ) {
         pLogger->ERREUR("Impossible d'ouvrir le fichier où écrire les degrés");
@@ -781,13 +782,13 @@ bool Voies::build_VOIES(){
 
     bool voiesToDo = true;
 
-    if (! pDatabase->tableExists("VOIES")) {
+    if (! pDatabase->tableExists("VOIES", m_schemaName)) {
         voiesToDo = true;
         pLogger->INFO("La table des VOIES n'est pas en base, on la construit !");
     } else {
         // Test si la table VOIES a deja ete construite avec les memes parametres methode + seuil
         QSqlQueryModel estMethodeActive;
-        estMethodeActive.setQuery(QString("SELECT * FROM INFO WHERE methode = %1 AND seuil_angle = %2 AND ACTIVE=TRUE").arg((int) m_methode).arg((int) m_seuil_angle));
+        estMethodeActive.setQuery(QString("SELECT * FROM "+m_schemaName+".INFO WHERE methode = %1 AND seuil_angle = %2 AND ACTIVE=TRUE").arg((int) m_methode).arg((int) m_seuil_angle));
         if (estMethodeActive.lastError().isValid()) {
             pLogger->ERREUR(QString("Ne peut pas tester l'existance dans table de ce methode + seuil : %1").arg(estMethodeActive.lastError().text()));
             return false;
@@ -801,12 +802,12 @@ bool Voies::build_VOIES(){
             // Les voies existent mais n'ont pas ete faites avec la meme methode
             voiesToDo = true;
 
-            if (! pDatabase->dropTable("VOIES")) {
+            if (! pDatabase->dropTable("VOIES", m_schemaName)) {
                 pLogger->ERREUR("Impossible de supprimer VOIES, pour la recreer avec la bonne methode");
                 return false;
             }
 
-            if (! pDatabase->dropTable("DTOPO_VOIES")) {
+            if (! pDatabase->dropTable("DTOPO_VOIES", m_schemaName)) {
                 pLogger->ERREUR("Impossible de supprimer DTOPO_VOIES, pour la recreer avec la bonne methode");
                 return false;
             }
@@ -821,7 +822,7 @@ bool Voies::build_VOIES(){
         // MISE A JOUR DE USED DANS ANGLES
 
         QSqlQuery queryAngle;
-        queryAngle.prepare("UPDATE ANGLES SET USED=FALSE;");
+        queryAngle.prepare("UPDATE "+m_schemaName+".ANGLES SET USED=FALSE;");
 
         if (! queryAngle.exec()) {
             pLogger->ERREUR(QString("Mise à jour de l'angle (USED=FALSE) : %1").arg(queryAngle.lastError().text()));
@@ -847,7 +848,7 @@ bool Voies::build_VOIES(){
         //CREATION DE LA TABLE VOIES D'ACCUEIL DEFINITIVE
 
         QSqlQueryModel createVOIES;
-        createVOIES.setQuery("CREATE TABLE VOIES ( IDV SERIAL NOT NULL PRIMARY KEY, MULTIGEOM geometry, LENGTH float, NBA integer, NBS integer, NBC integer, NBC_P integer);");
+        createVOIES.setQuery("CREATE TABLE "+m_schemaName+".VOIES ( IDV SERIAL NOT NULL PRIMARY KEY, MULTIGEOM geometry, LENGTH float, NBA integer, NBS integer, NBC integer, NBC_P integer);");
 
         if (createVOIES.lastError().isValid()) {
             pLogger->ERREUR(QString("createtable_voies : %1").arg(createVOIES.lastError().text()));
@@ -858,7 +859,7 @@ bool Voies::build_VOIES(){
 
         QSqlQueryModel *geometryArcs = new QSqlQueryModel();
 
-        geometryArcs->setQuery("SELECT IDA AS IDA, GEOM AS GEOM FROM SIF;");
+        geometryArcs->setQuery("SELECT IDA AS IDA, GEOM AS GEOM FROM "+m_schemaName+".SIF;");
 
         if (geometryArcs->lastError().isValid()) {
             pLogger->ERREUR(QString("req_arcsvoies : %1").arg(geometryArcs->lastError().text()));
@@ -888,7 +889,7 @@ bool Voies::build_VOIES(){
 
         delete geometryArcs;
 
-        QString geomfilename=QString("%1/geom_%2_%3.txt").arg(m_directory).arg(QSqlDatabase::database().databaseName()).arg(m_rawTableName);
+        QString geomfilename=QString("%1/geom_%2_%3.txt").arg(m_directory).arg(QSqlDatabase::database().databaseName()).arg(m_schemaName);
         QFile geomqfile( geomfilename );
         if (! geomqfile.open(QIODevice::ReadWrite) ) {
             pLogger->ERREUR("Impossible d'ouvrir le fichier où écrire les géométries");
@@ -910,7 +911,7 @@ bool Voies::build_VOIES(){
 
 
 
-            QString addVoie = QString("INSERT INTO VOIES(IDV, MULTIGEOM, NBA, NBS) VALUES (%1, ST_LineMerge(ST_Union(ARRAY[%2])) , %3, %4);")
+            QString addVoie = QString("INSERT INTO "+m_schemaName+".VOIES(IDV, MULTIGEOM, NBA, NBS) VALUES (%1, ST_LineMerge(ST_Union(ARRAY[%2])) , %3, %4);")
                     .arg(idv).arg(geometryVoies.at(idv)).arg(nba).arg(nbs);
 
             QSqlQuery addInVOIES;
@@ -931,7 +932,7 @@ bool Voies::build_VOIES(){
             int idv = m_Couples.at(ida).at(4);
 
             QSqlQuery addIDVAttInSIF;
-            addIDVAttInSIF.prepare("UPDATE SIF SET IDV = :IDV WHERE ida = :IDA ;");
+            addIDVAttInSIF.prepare("UPDATE "+m_schemaName+".SIF SET IDV = :IDV WHERE ida = :IDA ;");
             addIDVAttInSIF.bindValue(":IDV",idv);
             addIDVAttInSIF.bindValue(":IDA",ida);
 
@@ -948,7 +949,7 @@ bool Voies::build_VOIES(){
 
         // On calcule la longueur des voies
         QSqlQuery updateLengthInVOIES;
-        updateLengthInVOIES.prepare("UPDATE VOIES SET LENGTH = ST_Length(MULTIGEOM);");
+        updateLengthInVOIES.prepare("UPDATE "+m_schemaName+".VOIES SET LENGTH = ST_Length(MULTIGEOM);");
 
         if (! updateLengthInVOIES.exec()) {
             pLogger->ERREUR(QString("Impossible de calculer la longueur de la voie dans la table VOIES : %1").arg(updateLengthInVOIES.lastError().text()));
@@ -956,9 +957,9 @@ bool Voies::build_VOIES(){
         }
 
         // On calcule la connectivite sur la longueur
-        if (! pDatabase->add_att_div("VOIES","LOC","LENGTH","NBC")) return false;
+        if (! pDatabase->add_att_div("VOIES","LOC","LENGTH","NBC", m_schemaName)) return false;
 
-        if (! pDatabase->add_att_cl("VOIES", "CL_LOC", "LOC", 10, true)) return false;
+        if (! pDatabase->add_att_cl("VOIES", "CL_LOC", "LOC", 10, true, m_schemaName)) return false;
 
 
         pLogger->INFO("--------------------------- build_VOIES END --------------------------");
@@ -991,7 +992,7 @@ bool Voies::updateSIF(){
         int idv = m_Couples.at(ida).at(4);
 
         QSqlQuery addIDVAttInSIF;
-        addIDVAttInSIF.prepare("UPDATE SIF SET IDV = :IDV WHERE ida = :IDA ;");
+        addIDVAttInSIF.prepare("UPDATE "+m_schemaName+".SIF SET IDV = :IDV WHERE ida = :IDA ;");
         addIDVAttInSIF.bindValue(":IDV",idv);
         addIDVAttInSIF.bindValue(":IDA",ida);
 
@@ -1005,7 +1006,7 @@ bool Voies::updateSIF(){
 
     QSqlQueryModel *structFromVOIES = new QSqlQueryModel();
 
-    structFromVOIES->setQuery("SELECT IDV, STRUCT AS STRUCT_VOIE FROM VOIES;");
+    structFromVOIES->setQuery("SELECT IDV, STRUCT AS STRUCT_VOIE FROM "+m_schemaName+".VOIES;");
 
     if (structFromVOIES->lastError().isValid()) {
         pLogger->ERREUR(QString("Impossible de recuperer les structuralites dans VOIES : %1").arg(structFromVOIES->lastError().text()));
@@ -1018,7 +1019,7 @@ bool Voies::updateSIF(){
 
 
         QSqlQuery addStructAttInSIF;
-        addStructAttInSIF.prepare("UPDATE SIF SET STRUCT = :ST WHERE idv = :IDV ;");
+        addStructAttInSIF.prepare("UPDATE "+m_schemaName+".SIF SET STRUCT = :ST WHERE idv = :IDV ;");
         addStructAttInSIF.bindValue(":ST",struct_voie);
         addStructAttInSIF.bindValue(":IDV",idv);
 
@@ -1045,12 +1046,12 @@ bool Voies::updateSIF(){
 
 bool Voies::calcStructuralite(){
 
-    if (! pDatabase->columnExists("VOIES", "DEGREE") || ! pDatabase->columnExists("VOIES", "RTOPO") || ! pDatabase->columnExists("VOIES", "STRUCT")) {
+    if (! pDatabase->columnExists("VOIES", "DEGREE", m_schemaName) || ! pDatabase->columnExists("VOIES", "RTOPO", m_schemaName) || ! pDatabase->columnExists("VOIES", "STRUCT", m_schemaName)) {
         pLogger->INFO("---------------------- calcStructuralite START ----------------------");
 
         // AJOUT DE L'ATTRIBUT DE STRUCTURALITE
         QSqlQueryModel addStructInVOIES;
-        addStructInVOIES.setQuery("ALTER TABLE VOIES ADD DEGREE integer, ADD RTOPO float, ADD STRUCT float;");
+        addStructInVOIES.setQuery("ALTER TABLE "+m_schemaName+".VOIES ADD DEGREE integer, ADD RTOPO float, ADD STRUCT float;");
 
         if (addStructInVOIES.lastError().isValid()) {
             pLogger->ERREUR(QString("Impossible d'ajouter les attributs de structuralite dans VOIES : %1").arg(addStructInVOIES.lastError().text()));
@@ -1059,7 +1060,7 @@ bool Voies::calcStructuralite(){
 
         QSqlQueryModel *lengthFromVOIES = new QSqlQueryModel();
 
-        lengthFromVOIES->setQuery("SELECT IDV, length AS LENGTH_VOIE FROM VOIES;");
+        lengthFromVOIES->setQuery("SELECT IDV, length AS LENGTH_VOIE FROM "+m_schemaName+".VOIES;");
 
         if (lengthFromVOIES->lastError().isValid()) {
             pLogger->ERREUR(QString("Impossible de recuperer les longueurs dans VOIES : %1").arg(lengthFromVOIES->lastError().text()));
@@ -1072,7 +1073,7 @@ bool Voies::calcStructuralite(){
         }
 
         //open the file
-        QString lengthfilename=QString("%1/length_%2_%3.txt").arg(m_directory).arg(QSqlDatabase::database().databaseName()).arg(m_rawTableName);
+        QString lengthfilename=QString("%1/length_%2_%3.txt").arg(m_directory).arg(QSqlDatabase::database().databaseName()).arg(m_schemaName);
         QFile lengthqfile( lengthfilename );
         if (! lengthqfile.open(QIODevice::ReadWrite) ) {
             pLogger->ERREUR("Impossible d'ouvrir le fichier où écrire les longueurs");
@@ -1105,7 +1106,7 @@ bool Voies::calcStructuralite(){
         //TRAITEMENT DES m_nbVoies VOIES
 
         //open the file dtopofile
-        QString dtopofilename=QString("%1/dtopo_%2_%3.txt").arg(m_directory).arg(QSqlDatabase::database().databaseName()).arg(m_rawTableName);
+        QString dtopofilename=QString("%1/dtopo_%2_%3.txt").arg(m_directory).arg(QSqlDatabase::database().databaseName()).arg(m_schemaName);
         QFile dtopoqfile( dtopofilename );
         if (! dtopoqfile.open(QIODevice::ReadWrite) ) {
             pLogger->ERREUR("Impossible d'ouvrir le fichier où écrire les distance topographiques");
@@ -1116,7 +1117,7 @@ bool Voies::calcStructuralite(){
         dtopostream << m_nbVoies << endl;
 
         //open the file
-        QString adjacencyfilename=QString("%1/adjacency_%2_%3.txt").arg(m_directory).arg(QSqlDatabase::database().databaseName()).arg(m_rawTableName);
+        QString adjacencyfilename=QString("%1/adjacency_%2_%3.txt").arg(m_directory).arg(QSqlDatabase::database().databaseName()).arg(m_schemaName);
         QFile adjacencyqfile( adjacencyfilename );
         if (! adjacencyqfile.open(QIODevice::ReadWrite) ) {
             pLogger->ERREUR("Impossible d'ouvrir le fichier où écrire les adjacences");
@@ -1209,7 +1210,7 @@ bool Voies::calcStructuralite(){
                     if(nbvoies_connexe < m_nbVoies/2){
 
                         QSqlQuery deleteVOIES;
-                        deleteVOIES.prepare("DELETE FROM VOIES WHERE idv = :IDV ;");
+                        deleteVOIES.prepare("DELETE FROM "+m_schemaName+".VOIES WHERE idv = :IDV ;");
                         deleteVOIES.bindValue(":IDV",idv1 );
 
                         nb_voies_supprimees +=1;
@@ -1258,7 +1259,7 @@ bool Voies::calcStructuralite(){
 
             //INSERTION EN BASE
             QSqlQuery addStructAttInVOIES;
-            addStructAttInVOIES.prepare("UPDATE VOIES SET DEGREE = :D, RTOPO = :RT, STRUCT = :S WHERE idv = :IDV ;");
+            addStructAttInVOIES.prepare("UPDATE "+m_schemaName+".VOIES SET DEGREE = :D, RTOPO = :RT, STRUCT = :S WHERE idv = :IDV ;");
             addStructAttInVOIES.bindValue(":IDV",idv1 );
             addStructAttInVOIES.bindValue(":D",m_VoieVoies.at(idv1).size());
             addStructAttInVOIES.bindValue(":RT",rayonTopologique_v);
@@ -1312,18 +1313,18 @@ bool Voies::calcStructuralite(){
         dtopoqfile.close();
         adjacencyqfile.close();
 
-        if (! pDatabase->add_att_div("VOIES","SOL","STRUCT","LENGTH")) return false;
-        if (! pDatabase->add_att_div("VOIES","ROS","RTOPO","STRUCT")) return false;
+        if (! pDatabase->add_att_div("VOIES","SOL","STRUCT","LENGTH", m_schemaName)) return false;
+        if (! pDatabase->add_att_div("VOIES","ROS","RTOPO","STRUCT", m_schemaName)) return false;
 
-        if (! pDatabase->add_att_cl("VOIES", "CL_S", "STRUCT", 10, true)) return false;
-        if (! pDatabase->add_att_cl("VOIES", "CL_SOL", "SOL", 10, true)) return false;
-        if (! pDatabase->add_att_cl("VOIES", "CL_ROS", "ROS", 10, true)) return false;
+        if (! pDatabase->add_att_cl("VOIES", "CL_S", "STRUCT", 10, true, m_schemaName)) return false;
+        if (! pDatabase->add_att_cl("VOIES", "CL_SOL", "SOL", 10, true, m_schemaName)) return false;
+        if (! pDatabase->add_att_cl("VOIES", "CL_ROS", "ROS", 10, true, m_schemaName)) return false;
 
-        if (! pDatabase->add_att_cl("VOIES", "CL_RTOPO", "RTOPO", 10, true)) return false;
-        if (! pDatabase->add_att_cl("VOIES", "CL_LENGTH", "LENGTH", 10, true)) return false;
-        if (! pDatabase->add_att_cl("VOIES", "CL_DEGREE", "DEGREE", 10, true)) return false;
+        if (! pDatabase->add_att_cl("VOIES", "CL_RTOPO", "RTOPO", 10, true, m_schemaName)) return false;
+        if (! pDatabase->add_att_cl("VOIES", "CL_LENGTH", "LENGTH", 10, true, m_schemaName)) return false;
+        if (! pDatabase->add_att_cl("VOIES", "CL_DEGREE", "DEGREE", 10, true, m_schemaName)) return false;
 
-        if (! pDatabase->add_att_dif("VOIES", "DIFF_CL", "CL_S", "CL_RTOPO")) return false;
+        if (! pDatabase->add_att_dif("VOIES", "DIFF_CL", "CL_S", "CL_RTOPO", m_schemaName)) return false;
 
         pLogger->INFO("------------------------ calcStructuralite END ----------------------");
     } else {
@@ -1336,12 +1337,36 @@ bool Voies::calcStructuralite(){
 
 bool Voies::calcStructRel(){
 
-    if (! pDatabase->columnExists("VOIES", "RTOPO_SCL0") ||! pDatabase->columnExists("VOIES", "RTOPO_SCL1") || ! pDatabase->columnExists("VOIES", "RTOPO_MCL0") ||! pDatabase->columnExists("VOIES", "RTOPO_MCL1") || ! pDatabase->columnExists("VOIES", "RTOPO_S1")  || ! pDatabase->columnExists("VOIES", "RTOPO_S2") || ! pDatabase->columnExists("VOIES", "RTOPO_S3")  || ! pDatabase->columnExists("VOIES", "RTOPO_S4") || ! pDatabase->columnExists("VOIES", "RTOPO_S5")  || ! pDatabase->columnExists("VOIES", "RTOPO_S6") || ! pDatabase->columnExists("VOIES", "RTOPO_S7")  || ! pDatabase->columnExists("VOIES", "RTOPO_S8") || ! pDatabase->columnExists("VOIES", "RTOPO_S9")  || ! pDatabase->columnExists("VOIES", "RTOPO_S10")|| ! pDatabase->columnExists("VOIES", "RTOPO_M1")  || ! pDatabase->columnExists("VOIES", "RTOPO_M2") || ! pDatabase->columnExists("VOIES", "RTOPO_M3")  || ! pDatabase->columnExists("VOIES", "RTOPO_M4") || ! pDatabase->columnExists("VOIES", "RTOPO_M5")  || ! pDatabase->columnExists("VOIES", "RTOPO_M6") || ! pDatabase->columnExists("VOIES", "RTOPO_M7")  || ! pDatabase->columnExists("VOIES", "RTOPO_M8") || ! pDatabase->columnExists("VOIES", "RTOPO_M9")  || ! pDatabase->columnExists("VOIES", "RTOPO_M10")) {
+    if (! pDatabase->columnExists("VOIES", "RTOPO_SCL0", m_schemaName) ||
+            ! pDatabase->columnExists("VOIES", "RTOPO_SCL1", m_schemaName) ||
+            ! pDatabase->columnExists("VOIES", "RTOPO_MCL0", m_schemaName) ||
+            ! pDatabase->columnExists("VOIES", "RTOPO_MCL1", m_schemaName) ||
+            ! pDatabase->columnExists("VOIES", "RTOPO_S1", m_schemaName)  ||
+            ! pDatabase->columnExists("VOIES", "RTOPO_S2", m_schemaName) ||
+            ! pDatabase->columnExists("VOIES", "RTOPO_S3", m_schemaName)  ||
+            ! pDatabase->columnExists("VOIES", "RTOPO_S4", m_schemaName) ||
+            ! pDatabase->columnExists("VOIES", "RTOPO_S5", m_schemaName)  ||
+            ! pDatabase->columnExists("VOIES", "RTOPO_S6", m_schemaName) ||
+            ! pDatabase->columnExists("VOIES", "RTOPO_S7", m_schemaName)  ||
+            ! pDatabase->columnExists("VOIES", "RTOPO_S8", m_schemaName) ||
+            ! pDatabase->columnExists("VOIES", "RTOPO_S9", m_schemaName)  ||
+            ! pDatabase->columnExists("VOIES", "RTOPO_S10", m_schemaName)||
+            ! pDatabase->columnExists("VOIES", "RTOPO_M1", m_schemaName)  ||
+            ! pDatabase->columnExists("VOIES", "RTOPO_M2", m_schemaName) ||
+            ! pDatabase->columnExists("VOIES", "RTOPO_M3", m_schemaName)  ||
+            ! pDatabase->columnExists("VOIES", "RTOPO_M4", m_schemaName) ||
+            ! pDatabase->columnExists("VOIES", "RTOPO_M5", m_schemaName)  ||
+            ! pDatabase->columnExists("VOIES", "RTOPO_M6", m_schemaName) ||
+            ! pDatabase->columnExists("VOIES", "RTOPO_M7", m_schemaName)  ||
+            ! pDatabase->columnExists("VOIES", "RTOPO_M8", m_schemaName) ||
+            ! pDatabase->columnExists("VOIES", "RTOPO_M9", m_schemaName)  ||
+            ! pDatabase->columnExists("VOIES", "RTOPO_M10", m_schemaName)) {
+
         pLogger->INFO("---------------------- calcStructRel START ----------------------");
 
         // AJOUT DE L'ATTRIBUT DE STRUCTURALITE RELATIVE
         QSqlQueryModel addStructRelInVOIES;
-        addStructRelInVOIES.setQuery("ALTER TABLE VOIES ADD RTOPO_SCL0 integer, ADD RTOPO_SCL1 integer, ADD RTOPO_MCL0 integer, ADD RTOPO_MCL1 integer, ADD RTOPO_S1 integer, ADD RTOPO_S2 integer, ADD RTOPO_S3 integer, ADD RTOPO_S4 integer, ADD RTOPO_S5 integer, ADD RTOPO_S6 integer, ADD RTOPO_S7 integer, ADD RTOPO_S8 integer, ADD RTOPO_S9 integer, ADD RTOPO_S10 integer, ADD RTOPO_M1 integer, ADD RTOPO_M2 integer, ADD RTOPO_M3 integer, ADD RTOPO_M4 integer, ADD RTOPO_M5 integer, ADD RTOPO_M6 integer, ADD RTOPO_M7 integer, ADD RTOPO_M8 integer, ADD RTOPO_M9 integer, ADD RTOPO_M10 integer;");
+        addStructRelInVOIES.setQuery("ALTER TABLE  "+m_schemaName+".VOIES ADD RTOPO_SCL0 integer, ADD RTOPO_SCL1 integer, ADD RTOPO_MCL0 integer, ADD RTOPO_MCL1 integer, ADD RTOPO_S1 integer, ADD RTOPO_S2 integer, ADD RTOPO_S3 integer, ADD RTOPO_S4 integer, ADD RTOPO_S5 integer, ADD RTOPO_S6 integer, ADD RTOPO_S7 integer, ADD RTOPO_S8 integer, ADD RTOPO_S9 integer, ADD RTOPO_S10 integer, ADD RTOPO_M1 integer, ADD RTOPO_M2 integer, ADD RTOPO_M3 integer, ADD RTOPO_M4 integer, ADD RTOPO_M5 integer, ADD RTOPO_M6 integer, ADD RTOPO_M7 integer, ADD RTOPO_M8 integer, ADD RTOPO_M9 integer, ADD RTOPO_M10 integer;");
 
         if (addStructRelInVOIES.lastError().isValid()) {
             pLogger->ERREUR(QString("Impossible d'ajouter les attributs de structuralité relative dans VOIES : %1").arg(addStructRelInVOIES.lastError().text()));
@@ -1350,7 +1375,7 @@ bool Voies::calcStructRel(){
 
         QSqlQueryModel *structFromVOIES = new QSqlQueryModel();
 
-        structFromVOIES->setQuery("SELECT IDV, STRUCT AS STRUCT_VOIE, SOL AS MAILL_VOIE, CL_S AS CL_S, CL_SOL AS CL_SOL  FROM VOIES;");
+        structFromVOIES->setQuery("SELECT IDV, STRUCT AS STRUCT_VOIE, SOL AS MAILL_VOIE, CL_S AS CL_S, CL_SOL AS CL_SOL  FROM "+m_schemaName+".VOIES;");
 
         if (structFromVOIES->lastError().isValid()) {
             pLogger->ERREUR(QString("Impossible de recuperer les structuralites dans VOIES pour calculer l'inclusion: %1").arg(structFromVOIES->lastError().text()));
@@ -2270,7 +2295,7 @@ bool Voies::calcStructRel(){
 
             //INSERTION EN BASE
             QSqlQuery addSRAttInVOIES;
-            addSRAttInVOIES.prepare("UPDATE VOIES SET RTOPO_SCL0 = :RTOPO_SCL0, RTOPO_SCL1 = :RTOPO_SCL1,RTOPO_MCL0 = :RTOPO_MCL0, RTOPO_MCL1 = :RTOPO_MCL1, RTOPO_S1 = :RTOPO_S1, RTOPO_S2 = :RTOPO_S2, RTOPO_S3 = :RTOPO_S3, RTOPO_S4 = :RTOPO_S4, RTOPO_S5 = :RTOPO_S5, RTOPO_S6 = :RTOPO_S6, RTOPO_S7 = :RTOPO_S7, RTOPO_S8 = :RTOPO_S8, RTOPO_S9 = :RTOPO_S9, RTOPO_S10 = :RTOPO_S10, RTOPO_M1 = :RTOPO_M1, RTOPO_M2 = :RTOPO_M2, RTOPO_M3 = :RTOPO_M3, RTOPO_M4 = :RTOPO_M4, RTOPO_M5 = :RTOPO_M5, RTOPO_M6 = :RTOPO_M6, RTOPO_M7 = :RTOPO_M7, RTOPO_M8 = :RTOPO_M8, RTOPO_M9 = :RTOPO_M9, RTOPO_M10 = :RTOPO_M10 WHERE idv = :IDV ;");
+            addSRAttInVOIES.prepare("UPDATE "+m_schemaName+".VOIES SET RTOPO_SCL0 = :RTOPO_SCL0, RTOPO_SCL1 = :RTOPO_SCL1,RTOPO_MCL0 = :RTOPO_MCL0, RTOPO_MCL1 = :RTOPO_MCL1, RTOPO_S1 = :RTOPO_S1, RTOPO_S2 = :RTOPO_S2, RTOPO_S3 = :RTOPO_S3, RTOPO_S4 = :RTOPO_S4, RTOPO_S5 = :RTOPO_S5, RTOPO_S6 = :RTOPO_S6, RTOPO_S7 = :RTOPO_S7, RTOPO_S8 = :RTOPO_S8, RTOPO_S9 = :RTOPO_S9, RTOPO_S10 = :RTOPO_S10, RTOPO_M1 = :RTOPO_M1, RTOPO_M2 = :RTOPO_M2, RTOPO_M3 = :RTOPO_M3, RTOPO_M4 = :RTOPO_M4, RTOPO_M5 = :RTOPO_M5, RTOPO_M6 = :RTOPO_M6, RTOPO_M7 = :RTOPO_M7, RTOPO_M8 = :RTOPO_M8, RTOPO_M9 = :RTOPO_M9, RTOPO_M10 = :RTOPO_M10 WHERE idv = :IDV ;");
             addSRAttInVOIES.bindValue(":IDV",idv );
             addSRAttInVOIES.bindValue(":RTOPO_SCL0",dtopo_voies_scl0[idv]);
             addSRAttInVOIES.bindValue(":RTOPO_SCL1",dtopo_voies_scl1[idv]);
@@ -2315,12 +2340,12 @@ bool Voies::calcStructRel(){
 
 bool Voies::calcConnexion(){
 
-    if (! pDatabase->columnExists("VOIES", "NBCSIN") || ! pDatabase->columnExists("VOIES", "NBCSIN_P")) {
+    if (! pDatabase->columnExists("VOIES", "NBCSIN", m_schemaName) || ! pDatabase->columnExists("VOIES", "NBCSIN_P", m_schemaName)) {
         pLogger->INFO("---------------------- calcConnexion START ----------------------");
 
         // AJOUT DE L'ATTRIBUT DE CONNEXION == ORTHOGONALITE
         QSqlQueryModel addNbcsinInVOIES;
-        addNbcsinInVOIES.setQuery("ALTER TABLE VOIES ADD NBCSIN float, ADD NBCSIN_P float;");
+        addNbcsinInVOIES.setQuery("ALTER TABLE "+m_schemaName+".VOIES ADD NBCSIN float, ADD NBCSIN_P float;");
 
         if (addNbcsinInVOIES.lastError().isValid()) {
             pLogger->ERREUR(QString("Impossible d'ajouter l'attribut nbcsin dans VOIES : %1").arg(addNbcsinInVOIES.lastError().text()));
@@ -2532,7 +2557,7 @@ bool Voies::calcConnexion(){
 
             //INSERTION EN BASE
 
-            QString addNbcsin = QString("UPDATE VOIES SET NBCSIN = %1, NBCSIN_P = %2 WHERE idv = %3 ;").arg(nbc_sin).arg(nbc_sin_p).arg(idv);
+            QString addNbcsin = QString("UPDATE "+m_schemaName+".VOIES SET NBCSIN = %1, NBCSIN_P = %2 WHERE idv = %3 ;").arg(nbc_sin).arg(nbc_sin_p).arg(idv);
 
             QSqlQuery addNbcsinAttInVOIES;
             addNbcsinAttInVOIES.prepare(addNbcsin);
@@ -2545,12 +2570,12 @@ bool Voies::calcConnexion(){
         }//end for idv
 
 
-        if (! pDatabase->add_att_div("VOIES", "CONNECT", "NBCSIN", "NBC")) return false;
-        if (! pDatabase->add_att_div("VOIES", "CONNECT_P", "NBCSIN_P", "NBC_P")) return false;
+        if (! pDatabase->add_att_div("VOIES", "CONNECT", "NBCSIN", "NBC", m_schemaName)) return false;
+        if (! pDatabase->add_att_div("VOIES", "CONNECT_P", "NBCSIN_P", "NBC_P", m_schemaName)) return false;
 
-        if (! pDatabase->add_att_cl("VOIES", "CL_NBCSIN", "NBCSIN", 10, true)) return false;
-        if (! pDatabase->add_att_cl("VOIES", "CL_CONNECT", "CONNECT", 10, true)) return false;
-        if (! pDatabase->add_att_cl("VOIES", "CL_CONNECTP", "CONNECT_P", 10, true)) return false;
+        if (! pDatabase->add_att_cl("VOIES", "CL_NBCSIN", "NBCSIN", 10, true, m_schemaName)) return false;
+        if (! pDatabase->add_att_cl("VOIES", "CL_CONNECT", "CONNECT", 10, true, m_schemaName)) return false;
+        if (! pDatabase->add_att_cl("VOIES", "CL_CONNECTP", "CONNECT_P", 10, true, m_schemaName)) return false;
 
         //CLASSICATION EN 6 CLASSES
         // 0 - 0.6
@@ -2562,7 +2587,7 @@ bool Voies::calcConnexion(){
 
         // AJOUT DE L'ATTRIBUT DE CLASSIF
         QSqlQueryModel addorthoInVOIES;
-        addorthoInVOIES.setQuery("ALTER TABLE VOIES ADD C_ORTHO integer;");
+        addorthoInVOIES.setQuery("ALTER TABLE "+m_schemaName+".VOIES ADD C_ORTHO integer;");
 
         if (addorthoInVOIES.lastError().isValid()) {
             pLogger->ERREUR(QString("Impossible d'ajouter l'attribut c_ortho dans VOIES : %1").arg(addorthoInVOIES.lastError().text()));
@@ -2571,7 +2596,7 @@ bool Voies::calcConnexion(){
 
         QSqlQueryModel *connectpFromVOIES = new QSqlQueryModel();
 
-        connectpFromVOIES->setQuery("SELECT IDV, CONNECT_P FROM VOIES;");
+        connectpFromVOIES->setQuery("SELECT IDV, CONNECT_P FROM "+m_schemaName+".VOIES;");
 
         if (connectpFromVOIES->lastError().isValid()) {
             pLogger->ERREUR(QString("Impossible de recuperer les connect_p dans VOIES : %1").arg(connectpFromVOIES->lastError().text()));
@@ -2596,7 +2621,7 @@ bool Voies::calcConnexion(){
 
             //INSERTION EN BASE
 
-            QString addOrtho = QString("UPDATE VOIES SET C_ORTHO = %1 WHERE idv = %2 ;").arg(c_connectp).arg(idv);
+            QString addOrtho = QString("UPDATE "+m_schemaName+".VOIES SET C_ORTHO = %1 WHERE idv = %2 ;").arg(c_connectp).arg(idv);
 
             QSqlQuery addOrthoAttInVOIES;
             addOrthoAttInVOIES.prepare(addOrtho);
@@ -2621,13 +2646,13 @@ bool Voies::calcConnexion(){
 
 bool Voies::calcOrthoVoies(){
 
-    if (! pDatabase->columnExists("VOIES", "ORTHO")) {
+    if (! pDatabase->columnExists("VOIES", "ORTHO", m_schemaName)) {
         pLogger->INFO("---------------------- calcOrthoVoies START ----------------------");
         cout<<"---------------------- calcOrthoVoies START ----------------------"<<endl;
 
         // AJOUT DE L'ATTRIBUT D'ORTHOGONALITE
         QSqlQueryModel addOrthoInVOIES;
-        addOrthoInVOIES.setQuery("ALTER TABLE VOIES ADD ORTHO float;");
+        addOrthoInVOIES.setQuery("ALTER TABLE "+m_schemaName+".VOIES ADD ORTHO float;");
 
         if (addOrthoInVOIES.lastError().isValid()) {
             pLogger->ERREUR(QString("Impossible d'ajouter l'attribut ortho dans VOIES : %1").arg(addOrthoInVOIES.lastError().text()));
@@ -2679,7 +2704,7 @@ bool Voies::calcOrthoVoies(){
 
                 for(int i=0; i < arcsOutVoie.size(); i++) {
                     int arc = arcsOutVoie.at(i);
-                    QString req = QString("SELECT max(angle) AS maxdev FROM angles WHERE ids = %1 AND ( (ida1 = %2 AND (%3) ) OR (ida2 = %2 AND (%4) ) );").arg(ids).arg(arc).arg(ida2InOr).arg(ida1InOr);
+                    QString req = QString("SELECT max(angle) AS maxdev FROM "+m_schemaName+".angles WHERE ids = %1 AND ( (ida1 = %2 AND (%3) ) OR (ida2 = %2 AND (%4) ) );").arg(ids).arg(arc).arg(ida2InOr).arg(ida1InOr);
 
                     QSqlQueryModel reqAngleMax;
                     reqAngleMax.setQuery(req);
@@ -2701,7 +2726,7 @@ bool Voies::calcOrthoVoies(){
             if (nbc == 0) {
                 pLogger->ATTENTION(QString("La voie %1 a une connectivité de zéro !!").arg(idv));
 
-                QString addOrtho = QString("UPDATE VOIES SET NBC = 0, ORTHO = -1 WHERE idv = %3 ;").arg(idv);
+                QString addOrtho = QString("UPDATE "+m_schemaName+".VOIES SET NBC = 0, ORTHO = -1 WHERE idv = %3 ;").arg(idv);
 
                 QSqlQuery addOrthoInVOIES;
                 addOrthoInVOIES.prepare(addOrtho);
@@ -2714,7 +2739,7 @@ bool Voies::calcOrthoVoies(){
 
                 //INSERTION EN BASE
 
-                QString addOrtho = QString("UPDATE VOIES SET NBC = %1, ORTHO = %2/%1 WHERE idv = %3 ;").arg(nbc).arg(ortho).arg(idv);
+                QString addOrtho = QString("UPDATE "+m_schemaName+".VOIES SET NBC = %1, ORTHO = %2/%1 WHERE idv = %3 ;").arg(nbc).arg(ortho).arg(idv);
 
                 QSqlQuery addOrthoInVOIES;
                 addOrthoInVOIES.prepare(addOrtho);
@@ -2727,13 +2752,13 @@ bool Voies::calcOrthoVoies(){
 
         }//end for idv
 
-        if (! pDatabase->add_att_cl("VOIES", "CL_ORTHO", "ORTHO", 10, true)) return false;
+        if (! pDatabase->add_att_cl("VOIES", "CL_ORTHO", "ORTHO", 10, true, m_schemaName)) return false;
 
-        if (! pDatabase->add_att_div("VOIES","ROO","RTOPO","ORTHO")) return false;
-        if (! pDatabase->add_att_cl("VOIES", "CL_ROO", "ROO", 10, true)) return false;
+        if (! pDatabase->add_att_div("VOIES","ROO","RTOPO","ORTHO", m_schemaName)) return false;
+        if (! pDatabase->add_att_cl("VOIES", "CL_ROO", "ROO", 10, true, m_schemaName)) return false;
 
 
-        if (! pDatabase->add_att_cl("VOIES", "CL_NBC", "NBC", 10, true)) return false;
+        if (! pDatabase->add_att_cl("VOIES", "CL_NBC", "NBC", 10, true, m_schemaName)) return false;
 
 
 
@@ -2748,12 +2773,12 @@ bool Voies::calcOrthoVoies(){
 
 bool Voies::calcUse(){
 
-    if (! pDatabase->columnExists("VOIES", "USE") || ! pDatabase->columnExists("VOIES", "USE_MLT") || ! pDatabase->columnExists("VOIES", "USE_LGT")) {
+    if (! pDatabase->columnExists("VOIES", "USE", m_schemaName) || ! pDatabase->columnExists("VOIES", "USE_MLT", m_schemaName) || ! pDatabase->columnExists("VOIES", "USE_LGT", m_schemaName)) {
         pLogger->INFO("---------------------- calcUse START ----------------------");
 
         // AJOUT DE L'ATTRIBUT DE USE
         QSqlQueryModel addUseInVOIES;
-        addUseInVOIES.setQuery("ALTER TABLE VOIES ADD USE integer, ADD USE_MLT integer, ADD USE_MLT_MOY float, ADD USE_LGT integer;");
+        addUseInVOIES.setQuery("ALTER TABLE "+m_schemaName+".VOIES ADD USE integer, ADD USE_MLT integer, ADD USE_MLT_MOY float, ADD USE_LGT integer;");
 
         if (addUseInVOIES.lastError().isValid()) {
             pLogger->ERREUR(QString("Impossible d'ajouter les attributs de use dans VOIES : %1").arg(addUseInVOIES.lastError().text()));
@@ -2786,7 +2811,7 @@ bool Voies::calcUse(){
         //CALCUL DU NOMBRE DE VOIES DE LA PARTIE CONNEXE
         QSqlQueryModel *nombreVOIES = new QSqlQueryModel();
 
-        nombreVOIES->setQuery("SELECT COUNT(IDV) AS NBV FROM VOIES;");
+        nombreVOIES->setQuery("SELECT COUNT(IDV) AS NBV FROM "+m_schemaName+".VOIES;");
 
         if (nombreVOIES->lastError().isValid()) {
             pLogger->ERREUR(QString("Impossible de compter le nombre de VOIES : %1").arg(nombreVOIES->lastError().text()));
@@ -2807,7 +2832,7 @@ bool Voies::calcUse(){
         //CREATION DU TABLEAU DONNANT LA LONGUEUR DE CHAQUE VOIE
         QSqlQueryModel *lengthFromVOIES = new QSqlQueryModel();
 
-        lengthFromVOIES->setQuery("SELECT IDV, length AS LENGTH_VOIE FROM VOIES;");
+        lengthFromVOIES->setQuery("SELECT IDV, length AS LENGTH_VOIE FROM "+m_schemaName+".VOIES;");
 
         if (lengthFromVOIES->lastError().isValid()) {
             pLogger->ERREUR(QString("Impossible de recuperer les longueurs dans VOIES : %1").arg(lengthFromVOIES->lastError().text()));
@@ -3072,7 +3097,7 @@ bool Voies::calcUse(){
             if(voie_useLGT[idv] == 0){useLGT_v = voie_use[idv];}
 
             QSqlQuery addUseAttInVOIES;
-            addUseAttInVOIES.prepare("UPDATE VOIES SET USE = :USE, USE_MLT = :USE_MLT, USE_MLT_MOY = :USE_MLT_MOY, USE_LGT = :USE_LGT WHERE idv = :IDV ;");
+            addUseAttInVOIES.prepare("UPDATE "+m_schemaName+".VOIES SET USE = :USE, USE_MLT = :USE_MLT, USE_MLT_MOY = :USE_MLT_MOY, USE_LGT = :USE_LGT WHERE idv = :IDV ;");
             addUseAttInVOIES.bindValue(":IDV", idv );
             addUseAttInVOIES.bindValue(":USE",use_v);
             addUseAttInVOIES.bindValue(":USE_MLT",useMLT_v);
@@ -3087,13 +3112,13 @@ bool Voies::calcUse(){
 
         }//end for idv
 
-        if (! pDatabase->add_att_cl("VOIES", "CL_USE", "USE", 10, true)) return false;
+        if (! pDatabase->add_att_cl("VOIES", "CL_USE", "USE", 10, true, m_schemaName)) return false;
 
-        if (! pDatabase->add_att_cl("VOIES", "CL_USEMLT", "USE_MLT", 10, true)) return false;
+        if (! pDatabase->add_att_cl("VOIES", "CL_USEMLT", "USE_MLT", 10, true, m_schemaName)) return false;
 
-        if (! pDatabase->add_att_cl("VOIES", "CL_USEMLTMOY", "USE_MLT_MOY", 10, true)) return false;
+        if (! pDatabase->add_att_cl("VOIES", "CL_USEMLTMOY", "USE_MLT_MOY", 10, true, m_schemaName)) return false;
 
-        if (! pDatabase->add_att_cl("VOIES", "CL_USELGT", "USE_LGT", 10, true)) return false;
+        if (! pDatabase->add_att_cl("VOIES", "CL_USELGT", "USE_LGT", 10, true, m_schemaName)) return false;
 
         pLogger->INFO("------------------------ calcUse END ----------------------");
 
@@ -3107,12 +3132,12 @@ bool Voies::calcUse(){
 
 bool Voies::calcInclusion(){
 
-    if (! pDatabase->columnExists("VOIES", "INCL") || ! pDatabase->columnExists("VOIES", "INCL_MOY")) {
+    if (! pDatabase->columnExists("VOIES", "INCL", m_schemaName) || ! pDatabase->columnExists("VOIES", "INCL_MOY", m_schemaName)) {
         pLogger->INFO("---------------------- calcInclusion START ----------------------");
 
         // AJOUT DE L'ATTRIBUT D'INCLUSION
         QSqlQueryModel addInclInVOIES;
-        addInclInVOIES.setQuery("ALTER TABLE VOIES ADD INCL float, ADD INCL_MOY float;");
+        addInclInVOIES.setQuery("ALTER TABLE "+m_schemaName+".VOIES ADD INCL float, ADD INCL_MOY float;");
 
         if (addInclInVOIES.lastError().isValid()) {
             pLogger->ERREUR(QString("Impossible d'ajouter les attributs d'inclusion dans VOIES : %1").arg(addInclInVOIES.lastError().text()));
@@ -3121,7 +3146,7 @@ bool Voies::calcInclusion(){
 
         QSqlQueryModel *structFromVOIES = new QSqlQueryModel();
 
-        structFromVOIES->setQuery("SELECT IDV, STRUCT AS STRUCT_VOIE FROM VOIES;");
+        structFromVOIES->setQuery("SELECT IDV, STRUCT AS STRUCT_VOIE FROM "+m_schemaName+".VOIES;");
 
         if (structFromVOIES->lastError().isValid()) {
             pLogger->ERREUR(QString("Impossible de recuperer les structuralites dans VOIES pour calculer l'inclusion: %1").arg(structFromVOIES->lastError().text()));
@@ -3162,7 +3187,7 @@ bool Voies::calcInclusion(){
 
             //INSERTION EN BASE
             QSqlQuery addInclAttInVOIES;
-            addInclAttInVOIES.prepare("UPDATE VOIES SET INCL = :INCL, INCL_MOY = :INCL_MOY WHERE idv = :IDV ;");
+            addInclAttInVOIES.prepare("UPDATE "+m_schemaName+".VOIES SET INCL = :INCL, INCL_MOY = :INCL_MOY WHERE idv = :IDV ;");
             addInclAttInVOIES.bindValue(":IDV",idv1 );
             addInclAttInVOIES.bindValue(":INCL",inclusion);
             addInclAttInVOIES.bindValue(":INCL_MOY",inclusion_moy);
@@ -3175,11 +3200,11 @@ bool Voies::calcInclusion(){
 
         }//end for idv1
 
-        if (! pDatabase->add_att_cl("VOIES", "CL_INCL", "INCL", 10, true)) return false;
-        if (! pDatabase->add_att_cl("VOIES", "CL_INCLMOY", "INCL_MOY", 10, true)) return false;
+        if (! pDatabase->add_att_cl("VOIES", "CL_INCL", "INCL", 10, true, m_schemaName)) return false;
+        if (! pDatabase->add_att_cl("VOIES", "CL_INCLMOY", "INCL_MOY", 10, true, m_schemaName)) return false;
 
-        if (! pDatabase->add_att_div("VOIES","IOD","INCL","DEGREE")) return false;
-        if (! pDatabase->add_att_cl("VOIES", "CL_IOD", "IOD", 10, true)) return false;
+        if (! pDatabase->add_att_div("VOIES","IOD","INCL","DEGREE", m_schemaName)) return false;
+        if (! pDatabase->add_att_cl("VOIES", "CL_IOD", "IOD", 10, true, m_schemaName)) return false;
 
         pLogger->INFO(QString("STRUCTURALITE TOTALE SUR LE RESEAU : %1").arg(m_struct_tot));
 
@@ -3193,12 +3218,12 @@ bool Voies::calcInclusion(){
 
 bool Voies::calcLocalAccess(){
 
-    if (! pDatabase->columnExists("VOIES", "LOCAL_ACCESS1") || ! pDatabase->columnExists("VOIES", "LOCAL_ACCESS2") || ! pDatabase->columnExists("VOIES", "LOCAL_ACCESS3")) {
+    if (! pDatabase->columnExists("VOIES", "LOCAL_ACCESS1", m_schemaName) || ! pDatabase->columnExists("VOIES", "LOCAL_ACCESS2", m_schemaName) || ! pDatabase->columnExists("VOIES", "LOCAL_ACCESS3", m_schemaName)) {
         pLogger->INFO("---------------------- calcLocalAccess START ----------------------");
 
         // AJOUT DE L'ATTRIBUT D'ACCESSIBILITE LOCALE
         QSqlQueryModel addLAInVOIES;
-        addLAInVOIES.setQuery("ALTER TABLE VOIES ADD LOCAL_ACCESS1 integer, ADD LOCAL_ACCESS2 integer, ADD LOCAL_ACCESS3 integer;");
+        addLAInVOIES.setQuery("ALTER TABLE "+m_schemaName+".VOIES ADD LOCAL_ACCESS1 integer, ADD LOCAL_ACCESS2 integer, ADD LOCAL_ACCESS3 integer;");
 
         if (addLAInVOIES.lastError().isValid()) {
             pLogger->ERREUR(QString("Impossible d'ajouter les attributs d'accessibilité locale dans VOIES : %1").arg(addLAInVOIES.lastError().text()));
@@ -3207,7 +3232,7 @@ bool Voies::calcLocalAccess(){
 
         QSqlQueryModel *degreeFromVOIES = new QSqlQueryModel();
 
-        degreeFromVOIES->setQuery("SELECT IDV, DEGREE AS DEGREE_VOIE FROM VOIES;");
+        degreeFromVOIES->setQuery("SELECT IDV, DEGREE AS DEGREE_VOIE FROM "+m_schemaName+".VOIES;");
 
         if (degreeFromVOIES->lastError().isValid()) {
             pLogger->ERREUR(QString("Impossible de recuperer les degres dans VOIES pour calculer l'acessibilite locale: %1").arg(degreeFromVOIES->lastError().text()));
@@ -3262,7 +3287,7 @@ bool Voies::calcLocalAccess(){
 
             //INSERTION EN BASE
             QSqlQuery addInclAttInVOIES;
-            addInclAttInVOIES.prepare("UPDATE VOIES SET LOCAL_ACCESS1 = :LA1, LOCAL_ACCESS2 = :LA2, LOCAL_ACCESS3 = :LA3 WHERE idv = :IDV ;");
+            addInclAttInVOIES.prepare("UPDATE "+m_schemaName+".VOIES SET LOCAL_ACCESS1 = :LA1, LOCAL_ACCESS2 = :LA2, LOCAL_ACCESS3 = :LA3 WHERE idv = :IDV ;");
             addInclAttInVOIES.bindValue(":IDV",idv1 );
             addInclAttInVOIES.bindValue(":LA1",loc_acc_1);
             addInclAttInVOIES.bindValue(":LA2",loc_acc_2);
@@ -3276,9 +3301,9 @@ bool Voies::calcLocalAccess(){
 
         }//end for idv1
 
-        if (! pDatabase->add_att_cl("VOIES", "CL_LA1", "LOCAL_ACCESS1", 10, true)) return false;
-        if (! pDatabase->add_att_cl("VOIES", "CL_LA2", "LOCAL_ACCESS2", 10, true)) return false;
-        if (! pDatabase->add_att_cl("VOIES", "CL_LA3", "LOCAL_ACCESS3", 10, true)) return false;
+        if (! pDatabase->add_att_cl("VOIES", "CL_LA1", "LOCAL_ACCESS1", 10, true, m_schemaName)) return false;
+        if (! pDatabase->add_att_cl("VOIES", "CL_LA2", "LOCAL_ACCESS2", 10, true, m_schemaName)) return false;
+        if (! pDatabase->add_att_cl("VOIES", "CL_LA3", "LOCAL_ACCESS3", 10, true, m_schemaName)) return false;
 
     } else {
         pLogger->INFO("---------------- Local Access attributes already in VOIES -----------------");
@@ -3290,12 +3315,12 @@ bool Voies::calcLocalAccess(){
 
 bool Voies::calcBruitArcs(){
 
-    if (! pDatabase->columnExists("SIF", "BRUIT_1") || ! pDatabase->columnExists("SIF", "BRUIT_2")  || ! pDatabase->columnExists("SIF", "BRUIT_3")  || ! pDatabase->columnExists("SIF", "BRUIT_4")) {
+    if (! pDatabase->columnExists("SIF", "BRUIT_1", m_schemaName) || ! pDatabase->columnExists("SIF", "BRUIT_2", m_schemaName)  || ! pDatabase->columnExists("SIF", "BRUIT_3", m_schemaName)  || ! pDatabase->columnExists("SIF", "BRUIT_4", m_schemaName)) {
         pLogger->INFO("---------------------- calcBruitArcs START ----------------------");
 
         // AJOUT DE L'ATTRIBUT DE BRUIT
         QSqlQueryModel addBruitInSIF;
-        addBruitInSIF.setQuery("ALTER TABLE SIF ADD BRUIT_1 float, ADD BRUIT_2 float, ADD BRUIT_3 float, ADD BRUIT_4 float;");
+        addBruitInSIF.setQuery("ALTER TABLE "+m_schemaName+".SIF ADD BRUIT_1 float, ADD BRUIT_2 float, ADD BRUIT_3 float, ADD BRUIT_4 float;");
 
         if (addBruitInSIF.lastError().isValid()) {
             pLogger->ERREUR(QString("Impossible d'ajouter les attributs de bruit dans SIF : %1").arg(addBruitInSIF.lastError().text()));
@@ -3304,7 +3329,7 @@ bool Voies::calcBruitArcs(){
 
         QSqlQueryModel *attFromSIF = new QSqlQueryModel();
 
-        attFromSIF->setQuery("SELECT IDA, SI, SF, IDV, ST_length(GEOM) as LENGTH FROM SIF;");
+        attFromSIF->setQuery("SELECT IDA, SI, SF, IDV, ST_length(GEOM) as LENGTH FROM "+m_schemaName+".SIF;");
 
         if (attFromSIF->lastError().isValid()) {
             pLogger->ERREUR(QString("Impossible de recuperer les attributs dans SIF: %1").arg(attFromSIF->lastError().text()));
@@ -3393,7 +3418,7 @@ bool Voies::calcBruitArcs(){
 
             //INSERTION EN BASE
             QSqlQuery addBruitAttInSIF;
-            addBruitAttInSIF.prepare("UPDATE SIF SET BRUIT_1 = :B1, BRUIT_2 = :B2, BRUIT_3 = :B3, BRUIT_4 = :B4 WHERE ida = :IDA ;");
+            addBruitAttInSIF.prepare("UPDATE "+m_schemaName+".SIF SET BRUIT_1 = :B1, BRUIT_2 = :B2, BRUIT_3 = :B3, BRUIT_4 = :B4 WHERE ida = :IDA ;");
             addBruitAttInSIF.bindValue(":IDA",ida1 );
             addBruitAttInSIF.bindValue(":B1",bruit_1);
             addBruitAttInSIF.bindValue(":B2",bruit_2);
@@ -3419,12 +3444,12 @@ bool Voies::calcBruitArcs(){
 
 bool Voies::calcGradient(){
 
-    if (! pDatabase->columnExists("VOIES", "GRAD") || ! pDatabase->columnExists("VOIES", "GRAD_MOY")) {
+    if (! pDatabase->columnExists("VOIES", "GRAD", m_schemaName) || ! pDatabase->columnExists("VOIES", "GRAD_MOY", m_schemaName)) {
         pLogger->INFO("---------------------- calcGradient START ----------------------");
 
         // AJOUT DE L'ATTRIBUT DE GRADIENT
         QSqlQueryModel addGradlInVOIES;
-        addGradlInVOIES.setQuery("ALTER TABLE VOIES ADD GRAD float, ADD GRAD_MOY float;");
+        addGradlInVOIES.setQuery("ALTER TABLE "+m_schemaName+".VOIES ADD GRAD float, ADD GRAD_MOY float;");
 
         if (addGradlInVOIES.lastError().isValid()) {
             pLogger->ERREUR(QString("Impossible d'ajouter les attributs de gradient dans VOIES : %1").arg(addGradlInVOIES.lastError().text()));
@@ -3433,7 +3458,7 @@ bool Voies::calcGradient(){
 
         QSqlQueryModel *structFromVOIES = new QSqlQueryModel();
 
-        structFromVOIES->setQuery("SELECT IDV, STRUCT AS STRUCT_VOIE FROM VOIES;");
+        structFromVOIES->setQuery("SELECT IDV, STRUCT AS STRUCT_VOIE FROM "+m_schemaName+".VOIES;");
 
         if (structFromVOIES->lastError().isValid()) {
             pLogger->ERREUR(QString("Impossible de recuperer les structuralites dans VOIES pour calculer le gradient : %1").arg(structFromVOIES->lastError().text()));
@@ -3501,7 +3526,7 @@ bool Voies::calcGradient(){
 
             //INSERTION EN BASE
             QSqlQuery addInclAttInVOIES;
-            addInclAttInVOIES.prepare("UPDATE VOIES SET GRAD = :GRAD, GRAD_MOY = :GRAD_MOY WHERE idv = :IDV ;");
+            addInclAttInVOIES.prepare("UPDATE "+m_schemaName+".VOIES SET GRAD = :GRAD, GRAD_MOY = :GRAD_MOY WHERE idv = :IDV ;");
             addInclAttInVOIES.bindValue(":IDV",idv0 );
             addInclAttInVOIES.bindValue(":GRAD",gradient);
             addInclAttInVOIES.bindValue(":GRAD_MOY",gradient_moy);
@@ -3514,8 +3539,8 @@ bool Voies::calcGradient(){
 
         }//end for idv0
 
-        if (! pDatabase->add_att_cl("VOIES", "CL_GRAD", "GRAD", 10, true)) return false;
-        if (! pDatabase->add_att_cl("VOIES", "CL_GRADMOY", "GRAD_MOY", 10, true)) return false;
+        if (! pDatabase->add_att_cl("VOIES", "CL_GRAD", "GRAD", 10, true, m_schemaName)) return false;
+        if (! pDatabase->add_att_cl("VOIES", "CL_GRADMOY", "GRAD_MOY", 10, true, m_schemaName)) return false;
 
         pLogger->INFO(QString("STRUCTURALITE TOTALE SUR LE RESEAU : %1").arg(m_struct_tot));
 
@@ -3544,7 +3569,7 @@ bool Voies::insertINFO(){
 
     //STOCKAGE DES INFOS*******
 
-    if (! pDatabase->tableExists("INFO")){
+    if (! pDatabase->tableExists("INFO", m_schemaName)){
         pLogger->ERREUR("La table INFO doit etre presente au moment des voies");
         return false;
     }//endif
@@ -3552,7 +3577,7 @@ bool Voies::insertINFO(){
     // Test si existe methode + seuil
 
     QSqlQueryModel alreadyInTable;
-    alreadyInTable.setQuery(QString("SELECT * FROM INFO WHERE methode = %1 AND seuil_angle = %2").arg((int) m_methode).arg((int) m_seuil_angle));
+    alreadyInTable.setQuery(QString("SELECT * FROM "+m_schemaName+".INFO WHERE methode = %1 AND seuil_angle = %2").arg((int) m_methode).arg((int) m_seuil_angle));
     if (alreadyInTable.lastError().isValid()) {
         pLogger->ERREUR(QString("Ne peut pas tester l'existance dans table de cette methode et seuil : %1").arg(alreadyInTable.lastError().text()));
         return false;
@@ -3567,7 +3592,7 @@ bool Voies::insertINFO(){
         return true;
     } else if (isInTable && ! isActive) {
         QSqlQuery desactiveTous;
-        desactiveTous.prepare("UPDATE INFO SET ACTIVE=FALSE;");
+        desactiveTous.prepare("UPDATE "+m_schemaName+".INFO SET ACTIVE=FALSE;");
 
         if (! desactiveTous.exec()) {
             pLogger->ERREUR(QString("Impossible de desactiver toutes les configuratiosn de la table info : %1").arg(desactiveTous.lastError().text()));
@@ -3575,7 +3600,7 @@ bool Voies::insertINFO(){
         }
 
         QSqlQuery activeUn;
-        activeUn.prepare(QString("UPDATE INFO SET ACTIVE=TRUE WHERE methode = %1 AND seuil_angle = %2").arg((int) m_methode).arg((int) m_seuil_angle));
+        activeUn.prepare(QString("UPDATE "+m_schemaName+".INFO SET ACTIVE=TRUE WHERE methode = %1 AND seuil_angle = %2").arg((int) m_methode).arg((int) m_seuil_angle));
 
         if (! activeUn.exec()) {
             pLogger->ERREUR(QString("Impossible d'activer la bonne configuration toutes les configuration de la table info : %1").arg(activeUn.lastError().text()));
@@ -3585,7 +3610,7 @@ bool Voies::insertINFO(){
     } else {
         // La configuration n'est pas dans la table INFO
         QSqlQuery desactiveTous;
-        desactiveTous.prepare("UPDATE INFO SET ACTIVE=FALSE;");
+        desactiveTous.prepare("UPDATE "+m_schemaName+".INFO SET ACTIVE=FALSE;");
 
         if (! desactiveTous.exec()) {
             pLogger->ERREUR(QString("Impossible de desactiver toutes les configuration de la table info : %1").arg(desactiveTous.lastError().text()));
@@ -3622,7 +3647,7 @@ bool Voies::insertINFO(){
                                   "STDDEV(LOG(rtopo)) as STD_LOG_O, "
                                   "STDDEV(LOG(struct)) as STD_LOG_S "
 
-                                  "FROM VOIES "
+                                  "FROM "+m_schemaName+".VOIES "
 
                                   "WHERE length > 0 AND nba > 0 AND nbs > 0 AND nbc > 0 AND rtopo > 0 AND struct > 0;");
 
@@ -3666,7 +3691,7 @@ bool Voies::insertINFO(){
                                   "AVG(angle) as AVG_ANG, "
                                   "STDDEV(angle) as STD_ANG "
 
-                                  "FROM ANGLES WHERE USED;");
+                                  "FROM "+m_schemaName+".ANGLES WHERE USED;");
 
         if (req_angles_avg->lastError().isValid()) {
             pLogger->ERREUR(QString("create_info - req_angles_avg : %1").arg(req_angles_avg->lastError().text()));
@@ -3682,7 +3707,7 @@ bool Voies::insertINFO(){
         pLogger->INFO(QString("m_length_tot : %1").arg(m_length_tot));
 
         QSqlQuery info_in_db;
-        info_in_db.prepare("INSERT INTO INFO ("
+        info_in_db.prepare("INSERT INTO "+m_schemaName+".INFO ("
 
                            "methode, seuil_angle, LTOT, N_COUPLES, N_CELIBATAIRES, NV, "
                            "AVG_LVOIE, STD_LVOIE, AVG_ANG, STD_ANG, AVG_NBA, STD_NBA, AVG_NBS, STD_NBS, AVG_NBC, STD_NBC, AVG_O, STD_O, AVG_S, STD_S, "
@@ -3768,7 +3793,7 @@ bool Voies::do_Voies(){
 
     // Construction de la table VOIES en BDD
     if (! build_VOIES()) {
-        if (! pDatabase->dropTable("VOIES")) {
+        if (! pDatabase->dropTable("VOIES", m_schemaName)) {
             pLogger->ERREUR("build_VOIES en erreur, ROLLBACK (drop VOIES) echoue");
         } else {
             pLogger->INFO("build_VOIES en erreur, ROLLBACK (drop VOIES) reussi");
@@ -3788,22 +3813,22 @@ bool Voies::do_Voies(){
 bool Voies::do_Att_Arc(){
 
     if (! calcBruitArcs()) {
-        if (! pDatabase->dropColumn("SIF", "BRUIT_1")) {
+        if (! pDatabase->dropColumn("SIF", "BRUIT_1", m_schemaName)) {
             pLogger->ERREUR("calcBruitArcs en erreur, ROLLBACK (drop column BRUIT_1) echoue");
         } else {
             pLogger->INFO("calcBruitArcs en erreur, ROLLBACK (drop column BRUIT_1) reussi");
         }
-        if (! pDatabase->dropColumn("SIF", "BRUIT_2")) {
+        if (! pDatabase->dropColumn("SIF", "BRUIT_2", m_schemaName)) {
             pLogger->ERREUR("calcBruitArcs en erreur, ROLLBACK (drop column BRUIT_2) echoue");
         } else {
             pLogger->INFO("calcBruitArcs en erreur, ROLLBACK (drop column BRUIT_2) reussi");
         }
-        if (! pDatabase->dropColumn("SIF", "BRUIT_3")) {
+        if (! pDatabase->dropColumn("SIF", "BRUIT_3", m_schemaName)) {
             pLogger->ERREUR("calcBruitArcs en erreur, ROLLBACK (drop column BRUIT_3) echoue");
         } else {
             pLogger->INFO("calcBruitArcs en erreur, ROLLBACK (drop column BRUIT_3) reussi");
         }
-        if (! pDatabase->dropColumn("SIF", "BRUIT_4")) {
+        if (! pDatabase->dropColumn("SIF", "BRUIT_4", m_schemaName)) {
             pLogger->ERREUR("calcBruitArcs en erreur, ROLLBACK (drop column BRUIT_3) echoue");
         } else {
             pLogger->INFO("calcBruitArcs en erreur, ROLLBACK (drop column BRUIT_3) reussi");
@@ -3819,27 +3844,27 @@ bool Voies::do_Att_Voie(bool connexion, bool use, bool inclusion, bool gradient,
 
     // Calcul de la structuralite
     if (! calcStructuralite()) {
-        if (! pDatabase->dropColumn("VOIES", "DEGREE")) {
+        if (! pDatabase->dropColumn("VOIES", "DEGREE", m_schemaName)) {
             pLogger->ERREUR("calcStructuralite en erreur, ROLLBACK (drop column DEGREE) echoue");
         } else {
             pLogger->INFO("calcStructuralite en erreur, ROLLBACK (drop column DEGREE) reussi");
         }
-        if (! pDatabase->dropColumn("VOIES", "RTOPO")) {
+        if (! pDatabase->dropColumn("VOIES", "RTOPO", m_schemaName)) {
             pLogger->ERREUR("calcStructuralite en erreur, ROLLBACK (drop column RTOPO) echoue");
         } else {
             pLogger->INFO("calcStructuralite en erreur, ROLLBACK (drop column RTOPO) reussi");
         }
-        if (! pDatabase->dropColumn("VOIES", "STRUCT")) {
+        if (! pDatabase->dropColumn("VOIES", "STRUCT", m_schemaName)) {
             pLogger->ERREUR("calcStructuralite en erreur, ROLLBACK (drop column STRUCT) echoue");
         } else {
             pLogger->INFO("calcStructuralite en erreur, ROLLBACK (drop column STRUCT) reussi");
         }
-        if (! pDatabase->dropColumn("VOIES", "CL_S")) {
+        if (! pDatabase->dropColumn("VOIES", "CL_S", m_schemaName)) {
             pLogger->ERREUR("calcStructuralite en erreur, ROLLBACK (drop column CL_S) echoue");
         } else {
             pLogger->INFO("calcStructuralite en erreur, ROLLBACK (drop column CL_S) reussi");
         }
-        if (! pDatabase->dropColumn("VOIES", "SOL")) {
+        if (! pDatabase->dropColumn("VOIES", "SOL", m_schemaName)) {
             pLogger->ERREUR("calcStructuralite en erreur, ROLLBACK (drop column SOL) echoue");
         } else {
             pLogger->INFO("calcStructuralite en erreur, ROLLBACK (drop column SOL) reussi");
@@ -3848,122 +3873,122 @@ bool Voies::do_Att_Voie(bool connexion, bool use, bool inclusion, bool gradient,
     }
 
     if (! calcStructRel()){
-        if (! pDatabase->dropColumn("VOIES", "RTOPO_SCL0")) {
+        if (! pDatabase->dropColumn("VOIES", "RTOPO_SCL0", m_schemaName)) {
             pLogger->ERREUR("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_SCL0) echoue");
         } else {
             pLogger->INFO("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_SCL0) reussi");
         }
-        if (! pDatabase->dropColumn("VOIES", "RTOPO_SCL1")) {
+        if (! pDatabase->dropColumn("VOIES", "RTOPO_SCL1", m_schemaName)) {
             pLogger->ERREUR("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_SCL1) echoue");
         } else {
             pLogger->INFO("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_SCL1) reussi");
         }
-        if (! pDatabase->dropColumn("VOIES", "RTOPO_MCL0")) {
+        if (! pDatabase->dropColumn("VOIES", "RTOPO_MCL0", m_schemaName)) {
             pLogger->ERREUR("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_MCL0) echoue");
         } else {
             pLogger->INFO("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_MCL0) reussi");
         }
-        if (! pDatabase->dropColumn("VOIES", "RTOPO_MCL1")) {
+        if (! pDatabase->dropColumn("VOIES", "RTOPO_MCL1", m_schemaName)) {
             pLogger->ERREUR("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_MCL1) echoue");
         } else {
             pLogger->INFO("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_MCL1) reussi");
         }
-        if (! pDatabase->dropColumn("VOIES", "RTOPO_S1")) {
+        if (! pDatabase->dropColumn("VOIES", "RTOPO_S1", m_schemaName)) {
             pLogger->ERREUR("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_S1) echoue");
         } else {
             pLogger->INFO("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_S1) reussi");
         }
-        if (! pDatabase->dropColumn("VOIES", "RTOPO_S2")) {
+        if (! pDatabase->dropColumn("VOIES", "RTOPO_S2", m_schemaName)) {
             pLogger->ERREUR("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_S2) echoue");
         } else {
             pLogger->INFO("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_S2) reussi");
         }
-        if (! pDatabase->dropColumn("VOIES", "RTOPO_S3")) {
+        if (! pDatabase->dropColumn("VOIES", "RTOPO_S3", m_schemaName)) {
             pLogger->ERREUR("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_S3) echoue");
         } else {
             pLogger->INFO("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_S3) reussi");
         }
-        if (! pDatabase->dropColumn("VOIES", "RTOPO_S4")) {
+        if (! pDatabase->dropColumn("VOIES", "RTOPO_S4", m_schemaName)) {
             pLogger->ERREUR("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_S4) echoue");
         } else {
             pLogger->INFO("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_S4) reussi");
         }
-        if (! pDatabase->dropColumn("VOIES", "RTOPO_S5")) {
+        if (! pDatabase->dropColumn("VOIES", "RTOPO_S5", m_schemaName)) {
             pLogger->ERREUR("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_S5) echoue");
         } else {
             pLogger->INFO("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_S5) reussi");
         }
-        if (! pDatabase->dropColumn("VOIES", "RTOPO_S6")) {
+        if (! pDatabase->dropColumn("VOIES", "RTOPO_S6", m_schemaName)) {
             pLogger->ERREUR("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_S6) echoue");
         } else {
             pLogger->INFO("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_S6) reussi");
         }
-        if (! pDatabase->dropColumn("VOIES", "RTOPO_S7")) {
+        if (! pDatabase->dropColumn("VOIES", "RTOPO_S7", m_schemaName)) {
             pLogger->ERREUR("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_S7) echoue");
         } else {
             pLogger->INFO("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_S7) reussi");
         }
-        if (! pDatabase->dropColumn("VOIES", "RTOPO_S8")) {
+        if (! pDatabase->dropColumn("VOIES", "RTOPO_S8", m_schemaName)) {
             pLogger->ERREUR("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_S8) echoue");
         } else {
             pLogger->INFO("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_S8) reussi");
         }
-        if (! pDatabase->dropColumn("VOIES", "RTOPO_S9")) {
+        if (! pDatabase->dropColumn("VOIES", "RTOPO_S9", m_schemaName)) {
             pLogger->ERREUR("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_S9) echoue");
         } else {
             pLogger->INFO("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_S9) reussi");
         }
-        if (! pDatabase->dropColumn("VOIES", "RTOPO_S10")) {
+        if (! pDatabase->dropColumn("VOIES", "RTOPO_S10", m_schemaName)) {
             pLogger->ERREUR("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_S10) echoue");
         } else {
             pLogger->INFO("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_S10) reussi");
         }
-        if (! pDatabase->dropColumn("VOIES", "RTOPO_M1")) {
+        if (! pDatabase->dropColumn("VOIES", "RTOPO_M1", m_schemaName)) {
             pLogger->ERREUR("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_M1) echoue");
         } else {
             pLogger->INFO("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_M1) reussi");
         }
-        if (! pDatabase->dropColumn("VOIES", "RTOPO_M2")) {
+        if (! pDatabase->dropColumn("VOIES", "RTOPO_M2", m_schemaName)) {
             pLogger->ERREUR("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_M2) echoue");
         } else {
             pLogger->INFO("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_M2) reussi");
         }
-        if (! pDatabase->dropColumn("VOIES", "RTOPO_M3")) {
+        if (! pDatabase->dropColumn("VOIES", "RTOPO_M3", m_schemaName)) {
             pLogger->ERREUR("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_M31) echoue");
         } else {
             pLogger->INFO("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_M3) reussi");
         }
-        if (! pDatabase->dropColumn("VOIES", "RTOPO_M4")) {
+        if (! pDatabase->dropColumn("VOIES", "RTOPO_M4", m_schemaName)) {
             pLogger->ERREUR("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_M4) echoue");
         } else {
             pLogger->INFO("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_M4) reussi");
         }
-        if (! pDatabase->dropColumn("VOIES", "RTOPO_M5")) {
+        if (! pDatabase->dropColumn("VOIES", "RTOPO_M5", m_schemaName)) {
             pLogger->ERREUR("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_M5) echoue");
         } else {
             pLogger->INFO("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_M5) reussi");
         }
-        if (! pDatabase->dropColumn("VOIES", "RTOPO_M6")) {
+        if (! pDatabase->dropColumn("VOIES", "RTOPO_M6", m_schemaName)) {
             pLogger->ERREUR("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_M6) echoue");
         } else {
             pLogger->INFO("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_M6) reussi");
         }
-        if (! pDatabase->dropColumn("VOIES", "RTOPO_M7")) {
+        if (! pDatabase->dropColumn("VOIES", "RTOPO_M7", m_schemaName)) {
             pLogger->ERREUR("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_M7) echoue");
         } else {
             pLogger->INFO("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_M7) reussi");
         }
-        if (! pDatabase->dropColumn("VOIES", "RTOPO_M8")) {
+        if (! pDatabase->dropColumn("VOIES", "RTOPO_M8", m_schemaName)) {
             pLogger->ERREUR("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_M8) echoue");
         } else {
             pLogger->INFO("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_M8) reussi");
         }
-        if (! pDatabase->dropColumn("VOIES", "RTOPO_M9")) {
+        if (! pDatabase->dropColumn("VOIES", "RTOPO_M9", m_schemaName)) {
             pLogger->ERREUR("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_M9) echoue");
         } else {
             pLogger->INFO("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_M9) reussi");
         }
-        if (! pDatabase->dropColumn("VOIES", "RTOPO_M10")) {
+        if (! pDatabase->dropColumn("VOIES", "RTOPO_M10", m_schemaName)) {
             pLogger->ERREUR("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_M10) echoue");
         } else {
             pLogger->INFO("calcStructuraliteRel en erreur, ROLLBACK (drop column RTOPO_M10) reussi");
@@ -3973,17 +3998,17 @@ bool Voies::do_Att_Voie(bool connexion, bool use, bool inclusion, bool gradient,
 
     //calcul des angles de connexions (orthogonalité)
     if (connexion && ! calcConnexion()) {
-        if (! pDatabase->dropColumn("VOIES", "NBCSIN")) {
+        if (! pDatabase->dropColumn("VOIES", "NBCSIN", m_schemaName)) {
             pLogger->ERREUR("calcConnexion en erreur, ROLLBACK (drop column NBCSIN) echoue");
         } else {
             pLogger->INFO("calcConnexion en erreur, ROLLBACK (drop column NBCSIN) reussi");
         }
-        if (! pDatabase->dropColumn("VOIES", "NBCSIN_P")) {
+        if (! pDatabase->dropColumn("VOIES", "NBCSIN_P", m_schemaName)) {
             pLogger->ERREUR("calcConnexion en erreur, ROLLBACK (drop column NBCSIN_P) echoue");
         } else {
             pLogger->INFO("calcConnexion en erreur, ROLLBACK (drop column NBCSIN_P) reussi");
         }
-        if (! pDatabase->dropColumn("VOIES", "C_ORTHO")) {
+        if (! pDatabase->dropColumn("VOIES", "C_ORTHO", m_schemaName)) {
             pLogger->ERREUR("calcConnexion en erreur, ROLLBACK (drop column C_ORTHO) echoue");
         } else {
             pLogger->INFO("calcConnexion en erreur, ROLLBACK (drop column C_ORTHO) reussi");
@@ -3993,7 +4018,7 @@ bool Voies::do_Att_Voie(bool connexion, bool use, bool inclusion, bool gradient,
     }
 
     if( ! calcOrthoVoies()){
-        if (! pDatabase->dropColumn("VOIES", "ORTHO")) {
+        if (! pDatabase->dropColumn("VOIES", "ORTHO", m_schemaName)) {
             pLogger->ERREUR("calcOrthoVoies en erreur, ROLLBACK (drop column ORTHO) echoue");
         } else {
             pLogger->INFO("calcOrthoVoies en erreur, ROLLBACK (drop column ORTHO) reussi");
@@ -4003,17 +4028,17 @@ bool Voies::do_Att_Voie(bool connexion, bool use, bool inclusion, bool gradient,
 
     //calcul des utilisation (betweenness)
     if (use && ! calcUse()) {
-        if (! pDatabase->dropColumn("VOIES", "USE")) {
+        if (! pDatabase->dropColumn("VOIES", "USE", m_schemaName)) {
             pLogger->ERREUR("calcUse en erreur, ROLLBACK (drop column USE) echoue");
         } else {
             pLogger->INFO("calcUse en erreur, ROLLBACK (drop column USE) reussi");
         }
-        if (! pDatabase->dropColumn("VOIES", "USE_MLT")) {
+        if (! pDatabase->dropColumn("VOIES", "USE_MLT", m_schemaName)) {
             pLogger->ERREUR("calcUse en erreur, ROLLBACK (drop column USE_MLT) echoue");
         } else {
             pLogger->INFO("calcUse en erreur, ROLLBACK (drop column USE_MLT) reussi");
         }
-        if (! pDatabase->dropColumn("VOIES", "USE_LGT")) {
+        if (! pDatabase->dropColumn("VOIES", "USE_LGT", m_schemaName)) {
             pLogger->ERREUR("calcUse en erreur, ROLLBACK (drop column USE_LGT) echoue");
         } else {
             pLogger->INFO("calcUse en erreur, ROLLBACK (drop column USE_LGT) reussi");
@@ -4023,12 +4048,12 @@ bool Voies::do_Att_Voie(bool connexion, bool use, bool inclusion, bool gradient,
 
     // Calcul de l'inclusion
     if (inclusion && ! calcInclusion()) {
-        if (! pDatabase->dropColumn("VOIES", "INCL")) {
+        if (! pDatabase->dropColumn("VOIES", "INCL", m_schemaName)) {
             pLogger->ERREUR("calcInclusion en erreur, ROLLBACK (drop column INCL) echoue");
         } else {
             pLogger->INFO("calcInclusion en erreur, ROLLBACK (drop column INCL) reussi");
         }
-        if (! pDatabase->dropColumn("VOIES", "INCL_MOY")) {
+        if (! pDatabase->dropColumn("VOIES", "INCL_MOY", m_schemaName)) {
             pLogger->ERREUR("calcInclusion en erreur, ROLLBACK (drop column INCL_MOY) echoue");
         } else {
             pLogger->INFO("calcInclusion en erreur, ROLLBACK (drop column INCL_MOY) reussi");
@@ -4038,17 +4063,17 @@ bool Voies::do_Att_Voie(bool connexion, bool use, bool inclusion, bool gradient,
 
     // Calcul de l'accebilité locale
     if(local_access && ! calcLocalAccess() ){
-        if (! pDatabase->dropColumn("VOIES", "LOCAL_ACCESS1")) {
+        if (! pDatabase->dropColumn("VOIES", "LOCAL_ACCESS1", m_schemaName)) {
             pLogger->ERREUR("calcLocalAccess en erreur, ROLLBACK (drop column LOCAL_ACCESS1) echoue");
         } else {
             pLogger->INFO("calcLocalAccess en erreur, ROLLBACK (drop column LOCAL_ACCESS1) reussi");
         }
-        if (! pDatabase->dropColumn("VOIES", "LOCAL_ACCESS2")) {
+        if (! pDatabase->dropColumn("VOIES", "LOCAL_ACCESS2", m_schemaName)) {
             pLogger->ERREUR("calcLocalAccess en erreur, ROLLBACK (drop column LOCAL_ACCESS2) echoue");
         } else {
             pLogger->INFO("calcLocalAccess en erreur, ROLLBACK (drop column LOCAL_ACCESS2) reussi");
         }
-        if (! pDatabase->dropColumn("VOIES", "LOCAL_ACCESS3")) {
+        if (! pDatabase->dropColumn("VOIES", "LOCAL_ACCESS3", m_schemaName)) {
             pLogger->ERREUR("calcLocalAccess en erreur, ROLLBACK (drop column LOCAL_ACCESS3) echoue");
         } else {
             pLogger->INFO("calcLocalAccess en erreur, ROLLBACK (drop column LOCAL_ACCESS3) reussi");
@@ -4058,12 +4083,12 @@ bool Voies::do_Att_Voie(bool connexion, bool use, bool inclusion, bool gradient,
 
     // Calcul du gradient
     if (gradient && ! calcGradient()) {
-        if (! pDatabase->dropColumn("VOIES", "GRAD")) {
+        if (! pDatabase->dropColumn("VOIES", "GRAD", m_schemaName)) {
             pLogger->ERREUR("calcGradient en erreur, ROLLBACK (drop column GRAD) echoue");
         } else {
             pLogger->INFO("calcGradient en erreur, ROLLBACK (drop column GRAD) reussi");
         }
-        if (! pDatabase->dropColumn("VOIES", "GRAD_MOY")) {
+        if (! pDatabase->dropColumn("VOIES", "GRAD_MOY", m_schemaName)) {
             pLogger->ERREUR("calcGradient en erreur, ROLLBACK (drop column GRAD_MOY) echoue");
         } else {
             pLogger->INFO("calcGradient en erreur, ROLLBACK (drop column GRAD_MOY) reussi");
@@ -4071,12 +4096,13 @@ bool Voies::do_Att_Voie(bool connexion, bool use, bool inclusion, bool gradient,
         return false;
     }
 
+    //upadte SIF
+    if (! updateSIF()) return false;
 
     //construction de la table VOIES en BDD
     if (! insertINFO()) return false;
 
-    //upadte SIF
-    if (! updateSIF()) return false;
+
 
     return true;
 
