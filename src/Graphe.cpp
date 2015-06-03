@@ -168,7 +168,7 @@ bool Graphe::build_SIF(QSqlQueryModel* arcs_bruts){
         //CREATION DE LA TABLE SIF D'ACCUEIL DEFINITIVE
 
         QSqlQueryModel createTableSIF;
-        createTableSIF.setQuery("CREATE TABLE "+m_schemaName+".SIF ( IDA SERIAL NOT NULL PRIMARY KEY, SI bigint, SF bigint, GEOM geometry, IDV integer, STRUCT float, AZIMUTH_I double precision, AZIMUTH_F double precision, "
+        createTableSIF.setQuery("CREATE TABLE "+m_schemaName+".SIF ( IDA SERIAL NOT NULL PRIMARY KEY, SI bigint, SF bigint, GEOM geometry, IDV integer, STRUCT_VOIE float, RTOPO_VOIE integer, CLOSENESS_VOIE float, AZIMUTH_I double precision, AZIMUTH_F double precision, "
                                 "FOREIGN KEY (SI) REFERENCES "+m_schemaName+".SXYZ(IDS), "
                                 "FOREIGN KEY (SF) REFERENCES "+m_schemaName+".SXYZ(IDS) );");
 

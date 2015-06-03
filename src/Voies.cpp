@@ -1006,7 +1006,7 @@ bool Voies::updateSIF(){
 
     QSqlQueryModel *structFromVOIES = new QSqlQueryModel();
 
-    structFromVOIES->setQuery("SELECT IDV, STRUCT AS STRUCT_VOIE FROM "+m_schemaName+".VOIES;");
+    structFromVOIES->setQuery("SELECT IDV, STRUCT AS STRUCT_VOIE, RTOPO AS RTOPO_VOIE, CLOSENESS AS CLOSENESS_VOIE FROM "+m_schemaName+".VOIES;");
 
     if (structFromVOIES->lastError().isValid()) {
         pLogger->ERREUR(QString("Impossible de recuperer les structuralites dans VOIES : %1").arg(structFromVOIES->lastError().text()));
@@ -1016,11 +1016,15 @@ bool Voies::updateSIF(){
     for(int v = 0; v < m_nbVoies; v++){
         int idv = structFromVOIES->record(v).value("IDV").toInt();
         float struct_voie = structFromVOIES->record(v).value("STRUCT_VOIE").toFloat();
+        int rtopo_voie = structFromVOIES->record(v).value("RTOPO_VOIE").toFloat();
+        float closeness_voie = structFromVOIES->record(v).value("CLOSENESS_VOIE").toFloat();
 
 
         QSqlQuery addStructAttInSIF;
-        addStructAttInSIF.prepare("UPDATE "+m_schemaName+".SIF SET STRUCT = :ST WHERE idv = :IDV ;");
-        addStructAttInSIF.bindValue(":ST",struct_voie);
+        addStructAttInSIF.prepare("UPDATE "+m_schemaName+".SIF SET STRUCT_VOIE = :SV, RTOPO_VOIE = :RV, CLOSENESS_VOIE = :CV WHERE idv = :IDV ;");
+        addStructAttInSIF.bindValue(":SV",struct_voie);
+        addStructAttInSIF.bindValue(":RV",rtopo_voie);
+        addStructAttInSIF.bindValue(":CV",closeness_voie);
         addStructAttInSIF.bindValue(":IDV",idv);
 
         if (! addStructAttInSIF.exec()) {
@@ -1046,12 +1050,12 @@ bool Voies::updateSIF(){
 
 bool Voies::calcStructuralite(){
 
-    if (! pDatabase->columnExists("VOIES", "DEGREE", m_schemaName) || ! pDatabase->columnExists("VOIES", "RTOPO", m_schemaName) || ! pDatabase->columnExists("VOIES", "STRUCT", m_schemaName)) {
+    if (! pDatabase->columnExists("VOIES", "DEGREE", m_schemaName) || ! pDatabase->columnExists("VOIES", "RTOPO", m_schemaName) || ! pDatabase->columnExists("VOIES", "CLOSENESS", m_schemaName) || ! pDatabase->columnExists("VOIES", "STRUCT", m_schemaName)) {
         pLogger->INFO("---------------------- calcStructuralite START ----------------------");
 
         // AJOUT DE L'ATTRIBUT DE STRUCTURALITE
         QSqlQueryModel addStructInVOIES;
-        addStructInVOIES.setQuery("ALTER TABLE "+m_schemaName+".VOIES ADD DEGREE integer, ADD RTOPO float, ADD STRUCT float;");
+        addStructInVOIES.setQuery("ALTER TABLE "+m_schemaName+".VOIES ADD DEGREE integer, ADD RTOPO float, ADD CLOSENESS float, ADD STRUCT float;");
 
         if (addStructInVOIES.lastError().isValid()) {
             pLogger->ERREUR(QString("Impossible d'ajouter les attributs de structuralite dans VOIES : %1").arg(addStructInVOIES.lastError().text()));
@@ -1259,10 +1263,11 @@ bool Voies::calcStructuralite(){
 
             //INSERTION EN BASE
             QSqlQuery addStructAttInVOIES;
-            addStructAttInVOIES.prepare("UPDATE "+m_schemaName+".VOIES SET DEGREE = :D, RTOPO = :RT, STRUCT = :S WHERE idv = :IDV ;");
+            addStructAttInVOIES.prepare("UPDATE "+m_schemaName+".VOIES SET DEGREE = :D, RTOPO = :RT, CLOSENESS = :C, STRUCT = :S WHERE idv = :IDV ;");
             addStructAttInVOIES.bindValue(":IDV",idv1 );
             addStructAttInVOIES.bindValue(":D",m_VoieVoies.at(idv1).size());
             addStructAttInVOIES.bindValue(":RT",rayonTopologique_v);
+            addStructAttInVOIES.bindValue(":C",1/rayonTopologique_v);
             addStructAttInVOIES.bindValue(":S",structuralite_v);
 
             if (! addStructAttInVOIES.exec()) {
@@ -1315,6 +1320,7 @@ bool Voies::calcStructuralite(){
 
         if (! pDatabase->add_att_div("VOIES","SOL","STRUCT","LENGTH", m_schemaName)) return false;
         if (! pDatabase->add_att_div("VOIES","ROS","RTOPO","STRUCT", m_schemaName)) return false;
+        if (! pDatabase->add_att_div("VOIES","CLOSENESS_N","DEGREE","RTOPO", m_schemaName)) return false;
 
         if (! pDatabase->add_att_cl("VOIES", "CL_S", "STRUCT", 10, true, m_schemaName)) return false;
         if (! pDatabase->add_att_cl("VOIES", "CL_SOL", "SOL", 10, true, m_schemaName)) return false;
@@ -1323,6 +1329,9 @@ bool Voies::calcStructuralite(){
         if (! pDatabase->add_att_cl("VOIES", "CL_RTOPO", "RTOPO", 10, true, m_schemaName)) return false;
         if (! pDatabase->add_att_cl("VOIES", "CL_LENGTH", "LENGTH", 10, true, m_schemaName)) return false;
         if (! pDatabase->add_att_cl("VOIES", "CL_DEGREE", "DEGREE", 10, true, m_schemaName)) return false;
+
+        if (! pDatabase->add_att_cl("VOIES", "CL_CLO", "CLOSENESS", 10, true, m_schemaName)) return false;
+        if (! pDatabase->add_att_cl("VOIES", "CL_CLO_N", "CLOSENESS_N", 10, true, m_schemaName)) return false;
 
         if (! pDatabase->add_att_dif("VOIES", "DIFF_CL", "CL_S", "CL_RTOPO", m_schemaName)) return false;
 
@@ -3853,6 +3862,11 @@ bool Voies::do_Att_Voie(bool connexion, bool use, bool inclusion, bool gradient,
             pLogger->ERREUR("calcStructuralite en erreur, ROLLBACK (drop column RTOPO) echoue");
         } else {
             pLogger->INFO("calcStructuralite en erreur, ROLLBACK (drop column RTOPO) reussi");
+        }
+        if (! pDatabase->dropColumn("VOIES", "CLOSENESS", m_schemaName)) {
+            pLogger->ERREUR("calcStructuralite en erreur, ROLLBACK (drop column CLOSENESS) echoue");
+        } else {
+            pLogger->INFO("calcStructuralite en erreur, ROLLBACK (drop column CLOSENESS) reussi");
         }
         if (! pDatabase->dropColumn("VOIES", "STRUCT", m_schemaName)) {
             pLogger->ERREUR("calcStructuralite en erreur, ROLLBACK (drop column STRUCT) echoue");

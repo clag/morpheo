@@ -379,11 +379,6 @@ bool Database::add_att_cl(QString table, QString new_att, QString att_1, int nb_
             }
         }
 
-        if (current_length_cumul + len >= length_autorisee && current_category != nb_classes - 1) {
-            current_category++;
-            current_length_cumul = 0.;
-        }
-
         current_length_cumul += len;
         att_ant = att;
 
@@ -398,6 +393,12 @@ bool Database::add_att_cl(QString table, QString new_att, QString att_1, int nb_
             emit fatal(addClassification.lastError().text());
             return false;
         }
+
+        if (current_length_cumul >= length_autorisee && current_category != nb_classes - 1) {
+            current_category++;
+            current_length_cumul = 0.;
+        }
+
     }//end for e
 
     if (ascendant) {
