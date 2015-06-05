@@ -1256,6 +1256,12 @@ bool Voies::calcStructuralite(){
 
             }//end for l (calcul de l'ordre de la voie)
 
+            //CALCUL DE LA CLOSENESS
+            float closeness_v = 0;
+            if (rayonTopologique_v != 0){
+                closeness_v = 1 / rayonTopologique_v;
+            }
+
             //cout<<endl<<"*******VOIE IDV : "<<idv1<<endl;
             //for(int i=0; i <m_VoieVoies.at(idv1).size(); i++){
             //    cout<<"voie connectee : "<<m_VoieVoies.at(idv1).at(i)<<endl;
@@ -1267,7 +1273,7 @@ bool Voies::calcStructuralite(){
             addStructAttInVOIES.bindValue(":IDV",idv1 );
             addStructAttInVOIES.bindValue(":D",m_VoieVoies.at(idv1).size());
             addStructAttInVOIES.bindValue(":RT",rayonTopologique_v);
-            addStructAttInVOIES.bindValue(":C",1/rayonTopologique_v);
+            addStructAttInVOIES.bindValue(":C",closeness_v);
             addStructAttInVOIES.bindValue(":S",structuralite_v);
 
             if (! addStructAttInVOIES.exec()) {
@@ -1320,6 +1326,7 @@ bool Voies::calcStructuralite(){
 
         if (! pDatabase->add_att_div("VOIES","SOL","STRUCT","LENGTH", m_schemaName)) return false;
         if (! pDatabase->add_att_div("VOIES","ROS","RTOPO","STRUCT", m_schemaName)) return false;
+        if (! pDatabase->add_att_div("VOIES","RTOPO_N","RTOPO","DEGREE", m_schemaName)) return false;
         if (! pDatabase->add_att_div("VOIES","CLOSENESS_N","DEGREE","RTOPO", m_schemaName)) return false;
 
         if (! pDatabase->add_att_cl("VOIES", "CL_S", "STRUCT", 10, true, m_schemaName)) return false;
@@ -1332,6 +1339,7 @@ bool Voies::calcStructuralite(){
 
         if (! pDatabase->add_att_cl("VOIES", "CL_CLO", "CLOSENESS", 10, true, m_schemaName)) return false;
         if (! pDatabase->add_att_cl("VOIES", "CL_CLO_N", "CLOSENESS_N", 10, true, m_schemaName)) return false;
+        if (! pDatabase->add_att_cl("VOIES", "CL_RTOPO_N", "RTOPO_N", 10, true, m_schemaName)) return false;
 
         if (! pDatabase->add_att_dif("VOIES", "DIFF_CL", "CL_S", "CL_RTOPO", m_schemaName)) return false;
 
