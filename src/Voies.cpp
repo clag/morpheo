@@ -984,6 +984,40 @@ bool Voies::arcInVoie(long ida, long idv){
 
 }//END arcInVoie
 
+bool Voies::updateVOIE(){
+
+    QSqlQueryModel addNormAttInVOIE;
+    addNormAttInVOIE.setQuery("ALTER TABLE "+m_schemaName+".VOIES ADD CLOSENESS_NBV float, ADD RTOPO_NBV float;");
+
+    if (addNormAttInVOIE.lastError().isValid()) {
+        pLogger->ERREUR(QString("Impossible d'ajouter les attributs normalises dans voie. : %1").arg(addNormAttInVOIE.lastError().text()));
+        return false;
+    }
+
+    QSqlQueryModel calcRNormInVOIE;
+    calcRNormInVOIE.setQuery("UPDATE "+m_schemaName+".VOIES SET RTOPO_NBV = CAST(rtopo as float) / (select count(idv) from "+m_schemaName+".VOIES);");
+
+    if (calcRNormInVOIE.lastError().isValid()) {
+        pLogger->ERREUR(QString("Impossible de calculer les attributs normalisés de rtopo dans voie. : %1").arg(calcRNormInVOIE.lastError().text()));
+        return false;
+    }
+
+    QSqlQueryModel calcCNormInVOIE;
+    calcCNormInVOIE.setQuery("UPDATE "+m_schemaName+".VOIES SET CLOSENESS_NBV = (select count(idv) from "+m_schemaName+".VOIES) / CAST(rtopo as float) where rtopo !=0;");
+
+    if (calcCNormInVOIE.lastError().isValid()) {
+        pLogger->ERREUR(QString("Impossible de calculer les attributs normalisés de closeness dans voie. : %1").arg(calcCNormInVOIE.lastError().text()));
+        return false;
+    }
+
+
+    if (! pDatabase->add_att_cl("VOIES", "CL_CLO_N", "CLOSENESS_NBV", 10, true, m_schemaName)) return false;
+    if (! pDatabase->add_att_cl("VOIES", "CL_RTO_N", "RTOPO_NBV", 10, true, m_schemaName)) return false;
+
+
+    return true;
+}//END updateVOIE
+
 bool Voies::updateSIF(){
 
     //On ajoute la voie correspondante à l'arc dans SIF
@@ -1257,10 +1291,13 @@ bool Voies::calcStructuralite(){
             }//end for l (calcul de l'ordre de la voie)
 
             //CALCUL DE LA CLOSENESS
-            float closeness_v = 0;
+            float closeness_v;
             if (rayonTopologique_v != 0){
-                closeness_v = 1 / rayonTopologique_v;
+                closeness_v = 1. / (float) rayonTopologique_v;
             }
+
+            //cout<<"rayonTopologique_v = "<<rayonTopologique_v<<endl;
+            //cout<<"closeness_v = "<<closeness_v<<endl;
 
             //cout<<endl<<"*******VOIE IDV : "<<idv1<<endl;
             //for(int i=0; i <m_VoieVoies.at(idv1).size(); i++){
@@ -1326,8 +1363,6 @@ bool Voies::calcStructuralite(){
 
         if (! pDatabase->add_att_div("VOIES","SOL","STRUCT","LENGTH", m_schemaName)) return false;
         if (! pDatabase->add_att_div("VOIES","ROS","RTOPO","STRUCT", m_schemaName)) return false;
-        if (! pDatabase->add_att_div("VOIES","RTOPO_N","RTOPO","DEGREE", m_schemaName)) return false;
-        if (! pDatabase->add_att_div("VOIES","CLOSENESS_N","DEGREE","RTOPO", m_schemaName)) return false;
 
         if (! pDatabase->add_att_cl("VOIES", "CL_S", "STRUCT", 10, true, m_schemaName)) return false;
         if (! pDatabase->add_att_cl("VOIES", "CL_SOL", "SOL", 10, true, m_schemaName)) return false;
@@ -1338,8 +1373,6 @@ bool Voies::calcStructuralite(){
         if (! pDatabase->add_att_cl("VOIES", "CL_DEGREE", "DEGREE", 10, true, m_schemaName)) return false;
 
         if (! pDatabase->add_att_cl("VOIES", "CL_CLO", "CLOSENESS", 10, true, m_schemaName)) return false;
-        if (! pDatabase->add_att_cl("VOIES", "CL_CLO_N", "CLOSENESS_N", 10, true, m_schemaName)) return false;
-        if (! pDatabase->add_att_cl("VOIES", "CL_RTOPO_N", "RTOPO_N", 10, true, m_schemaName)) return false;
 
         if (! pDatabase->add_att_dif("VOIES", "DIFF_CL", "CL_S", "CL_RTOPO", m_schemaName)) return false;
 
@@ -4117,6 +4150,10 @@ bool Voies::do_Att_Voie(bool connexion, bool use, bool inclusion, bool gradient,
         }
         return false;
     }
+
+    //update VOIES
+    if (! updateVOIE()) return false;
+
 
     //upadte SIF
     if (! updateSIF()) return false;

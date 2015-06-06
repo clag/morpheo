@@ -382,6 +382,12 @@ bool Database::add_att_cl(QString table, QString new_att, QString att_1, int nb_
         current_length_cumul += len;
         att_ant = att;
 
+        /*VOIES : transition faite AVANT*/
+        if (current_length_cumul >= length_autorisee && current_category != nb_classes - 1) {
+            current_category++;
+            current_length_cumul = 0.;
+        }
+
         //emit information(QString("id : %1, att : %2, current_category : %3").arg(id).arg(att).arg(current_category));
 
         //INSERTION EN BASE
@@ -394,10 +400,11 @@ bool Database::add_att_cl(QString table, QString new_att, QString att_1, int nb_
             return false;
         }
 
+        /*ARCS : transition faite APRES
         if (current_length_cumul >= length_autorisee && current_category != nb_classes - 1) {
             current_category++;
             current_length_cumul = 0.;
-        }
+        }*/
 
     }//end for e
 

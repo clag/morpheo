@@ -81,6 +81,8 @@ private:
 
     //---complétion de la table SIF
     bool updateSIF();
+    //---complétion de la table VOIE
+    bool updateVOIE();
 
     QString m_rawTableName;
     QString m_directory;
