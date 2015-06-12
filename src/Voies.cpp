@@ -1245,7 +1245,7 @@ bool Voies::calcStructuralite(){
 
                     //SUPPRESSION DES VOIES NON CONNEXES AU GRAPHE PRINCIPAL
 
-                    if(nbvoies_connexe < m_nbVoies/2){
+                    if(nbvoies_connexe < m_nbVoies/4){
 
                         QSqlQuery deleteVOIES;
                         deleteVOIES.prepare("DELETE FROM "+m_schemaName+".VOIES WHERE idv = :IDV ;");
@@ -3139,7 +3139,15 @@ bool Voies::calcUse(){
 
             int use_v = voie_use[idv];
             int useMLT_v = voie_useMLT[idv];
-            float useMLT_moy = ((float)useMLT_v / (float)nb_chemin);
+            float useMLT_moy;
+            if(nb_chemin != 0){
+             useMLT_moy   = ((float)useMLT_v / (float)nb_chemin);
+            }
+            else{
+                cout<<"AUCUN CHEMIN TROUVE : PAS DE VOIES !!!!!!!"<<endl;
+                return false;
+            }
+
 
 
 
